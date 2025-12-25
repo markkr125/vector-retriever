@@ -12,7 +12,7 @@ Advanced vector database experiment demonstrating **Qdrant's powerful features**
 - [Advanced Search Examples](#-advanced-search-examples)
 - [Dataset Structure](#-dataset-structure)
 - [Configuration](#-configuration)
-- [Architecture](#-architecture)
+- [Architecture](#️-architecture)
 - [Learning Resources](#-learning-resources)
 - [Example Output](#-example-output)
 - [Customization](#-customization)
