@@ -367,7 +367,7 @@ For fast filtered searches, the following indexes are created:
 1. **Hybrid Search**: [Documentation](https://qdrant.tech/documentation/concepts/hybrid-queries/)
 2. **Payload Filtering**: [Documentation](https://qdrant.tech/documentation/concepts/filtering/)
 3. **Geo-Filtering**: [Documentation](https://qdrant.tech/documentation/concepts/filtering/#geo)
-4. **Sparse Vectors**: [Documentation](https://qdrant.tech/documentation/concepts/sparse-vectors/)
+4. **Sparse Vectors**: [Documentation](https://qdrant.tech/articles/sparse-vectors/)
 
 ### Why Hybrid Search?
 
