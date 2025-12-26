@@ -1,0 +1,11 @@
+{
+  "content": "Hotel Windsor - Premium Luxury Hotel in Sydney",
+  "category": "hotel",
+  "location": "Sydney",
+  "metadata": {
+    "rating": 4.8,
+    "price": 450,
+    "tags": ["luxury", "premium", "city-center"],
+    "status": "active"
+  }
+}

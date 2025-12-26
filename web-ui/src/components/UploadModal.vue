@@ -8,27 +8,93 @@
 
       <div class="modal-body">
         <form @submit.prevent="handleSubmit">
-          <!-- Filename -->
+          <!-- Upload Method Selector -->
           <div class="form-group">
-            <label class="label">Filename *</label>
-            <input 
-              v-model="document.filename"
-              type="text"
-              class="input"
-              placeholder="my_document.txt"
-              required
-            >
-            <span class="hint">Include .txt extension</span>
+            <label class="label">Upload Method</label>
+            <div class="upload-method-selector">
+              <button 
+                type="button"
+                @click="uploadMethod = 'file'"
+                :class="['method-btn', { active: uploadMethod === 'file' }]"
+              >
+                📁 Upload File
+              </button>
+              <button 
+                type="button"
+                @click="uploadMethod = 'text'"
+                :class="['method-btn', { active: uploadMethod === 'text' }]"
+              >
+                📝 Paste Text
+              </button>
+            </div>
           </div>
 
-          <!-- Content -->
-          <div class="form-group">
-            <label class="label">Content *</label>
-            <textarea 
-              v-model="document.content"
-              class="textarea"
-              rows="10"
-              placeholder="Enter document content here...
+          <!-- File Upload Section -->
+          <div v-if="uploadMethod === 'file'" class="file-upload-section">
+            <div class="form-group">
+              <label class="label">Select Files *</label>
+              <div class="file-input-wrapper">
+                <input 
+                  type="file"
+                  ref="fileInput"
+                  @change="handleFileSelect"
+                  accept=".txt,.json,.pdf,.doc,.docx"
+                  class="file-input"
+                  id="file-upload"
+                  multiple
+                >
+                <label for="file-upload" class="file-input-label">
+                  <span v-if="selectedFiles.length === 0">📎 Choose files...</span>
+                  <span v-else>{{ selectedFiles.length }} file{{ selectedFiles.length > 1 ? 's' : '' }} selected</span>
+                </label>
+              </div>
+              <span class="hint">Supported: .txt, .json, .pdf, .doc, .docx (max {{ maxFileSizeMB }}MB each) - Select multiple files</span>
+            </div>
+
+            <div v-if="selectedFiles.length > 0" class="files-list">
+              <div v-for="(file, index) in selectedFiles" :key="index" class="file-item">
+                <div class="file-item-info">
+                  <span class="file-icon">📄</span>
+                  <div class="file-details">
+                    <p class="file-name">{{ file.name }}</p>
+                    <p class="file-meta">{{ formatFileSize(file.size) }} • {{ file.type || 'Unknown' }}</p>
+                  </div>
+                </div>
+                <button 
+                  type="button" 
+                  @click="removeFile(index)" 
+                  class="remove-file-btn"
+                  title="Remove file"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Text Input Section -->
+          <div v-else>
+            <!-- Filename -->
+            <div class="form-group">
+              <label class="label">Filename *</label>
+              <input 
+                v-model="document.filename"
+                type="text"
+                class="input"
+                placeholder="my_document.txt"
+                required
+              >
+              <span class="hint">Include file extension</span>
+            </div>
+
+            <!-- Content -->
+            <div class="form-group">
+              <label class="label">Content *</label>
+              <textarea 
+                v-model="document.content"
+                class="textarea"
+                rows="10"
+                placeholder="Enter document content here...
 
 You can include structured metadata at the top:
 Category: hotel
@@ -39,9 +105,10 @@ Rating: 4.8
 Coordinates: 48.8566, 2.3522
 
 Or just plain text for unstructured documents."
-              required
-            ></textarea>
-            <span class="hint">{{ document.content.split(/\s+/).length }} words, {{ document.content.length }} characters</span>
+                required
+              ></textarea>
+              <span class="hint">{{ document.content.split(/\s+/).length }} words, {{ document.content.length }} characters</span>
+            </div>
           </div>
 
           <!-- Optional Metadata -->
@@ -181,10 +248,15 @@ Or just plain text for unstructured documents."
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import api from '../api'
 
 const emit = defineEmits(['close', 'success'])
+
+const uploadMethod = ref('file')
+const selectedFiles = ref([])
+const fileInput = ref(null)
+const maxFileSizeMB = ref(10) // Default value
 
 const document = ref({
   filename: '',
@@ -207,8 +279,53 @@ const successMessage = ref('')
 const errorMessage = ref('')
 
 const canSubmit = computed(() => {
-  return document.value.filename.trim() && document.value.content.trim()
+  if (uploadMethod.value === 'file') {
+    return selectedFiles.value.length > 0
+  } else {
+    return document.value.filename.trim() && document.value.content.trim()
+  }
 })
+
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+}
+
+const fetchConfig = async () => {
+  try {
+    const response = await api.get('/config')
+    maxFileSizeMB.value = response.data.maxFileSizeMB
+  } catch (error) {
+    console.error('Failed to fetch config:', error)
+    // Keep default value of 10MB
+  }
+}
+
+onMounted(() => {
+  fetchConfig()
+})
+
+const handleFileSelect = (event) => {
+  const files = Array.from(event.target.files)
+  
+  // Validate file sizes
+  const maxBytes = maxFileSizeMB.value * 1024 * 1024
+  const invalidFiles = files.filter(file => file.size > maxBytes)
+  if (invalidFiles.length > 0) {
+    errorMessage.value = `${invalidFiles.length} file(s) exceed ${maxFileSizeMB.value}MB limit`
+    return
+  }
+  
+  selectedFiles.value = files
+  errorMessage.value = ''
+}
+
+const removeFile = (index) => {
+  selectedFiles.value.splice(index, 1)
+}
 
 const close = () => {
   emit('close')
@@ -220,37 +337,103 @@ const handleSubmit = async () => {
   errorMessage.value = ''
 
   try {
-    // Prepare metadata
-    const metadata = {}
-    
-    if (document.value.metadata.category) metadata.category = document.value.metadata.category
-    if (document.value.metadata.location) metadata.location = document.value.metadata.location
-    if (document.value.metadata.price) metadata.price = document.value.metadata.price
-    if (document.value.metadata.rating) metadata.rating = document.value.metadata.rating
-    if (document.value.metadata.status) metadata.status = document.value.metadata.status
-    
-    if (document.value.metadata.tagsInput) {
-      metadata.tags = document.value.metadata.tagsInput
-        .split(',')
-        .map(t => t.trim())
-        .filter(t => t)
-    }
-    
-    if (document.value.metadata.lat && document.value.metadata.lon) {
-      metadata.coordinates = {
-        lat: document.value.metadata.lat,
-        lon: document.value.metadata.lon
+    if (uploadMethod.value === 'file') {
+      // File upload mode
+      if (selectedFiles.value.length === 0) {
+        errorMessage.value = 'Please select at least one file'
+        uploading.value = false
+        return
       }
+
+      // Prepare metadata once
+      const metadata = {}
+      if (document.value.metadata.category) metadata.category = document.value.metadata.category
+      if (document.value.metadata.location) metadata.location = document.value.metadata.location
+      if (document.value.metadata.price) metadata.price = document.value.metadata.price
+      if (document.value.metadata.rating) metadata.rating = document.value.metadata.rating
+      if (document.value.metadata.status) metadata.status = document.value.metadata.status
+      
+      if (document.value.metadata.tagsInput) {
+        metadata.tags = document.value.metadata.tagsInput
+          .split(',')
+          .map(t => t.trim())
+          .filter(t => t)
+      }
+      
+      if (document.value.metadata.lat && document.value.metadata.lon) {
+        metadata.coordinates = {
+          lat: document.value.metadata.lat,
+          lon: document.value.metadata.lon
+        }
+      }
+
+      // Upload files one by one
+      let successCount = 0
+      let failCount = 0
+      
+      for (const file of selectedFiles.value) {
+        try {
+          const formData = new FormData()
+          formData.append('file', file)
+          // Base64 encode the filename to prevent encoding issues with Hebrew/Arabic/etc
+          formData.append('filename_encoded', btoa(unescape(encodeURIComponent(file.name))))
+
+          if (Object.keys(metadata).length > 0) {
+            formData.append('metadata', JSON.stringify(metadata))
+          }
+
+          await api.post('/documents/upload', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            }
+          })
+          
+          successCount++
+        } catch (err) {
+          console.error(`Failed to upload ${file.name}:`, err)
+          failCount++
+        }
+      }
+
+      if (failCount === 0) {
+        successMessage.value = `Successfully uploaded ${successCount} file${successCount > 1 ? 's' : ''}`
+      } else {
+        successMessage.value = `Uploaded ${successCount} file${successCount > 1 ? 's' : ''}, ${failCount} failed`
+      }
+
+    } else {
+      // Text input mode (original functionality)
+      const metadata = {}
+      
+      if (document.value.metadata.category) metadata.category = document.value.metadata.category
+      if (document.value.metadata.location) metadata.location = document.value.metadata.location
+      if (document.value.metadata.price) metadata.price = document.value.metadata.price
+      if (document.value.metadata.rating) metadata.rating = document.value.metadata.rating
+      if (document.value.metadata.status) metadata.status = document.value.metadata.status
+      
+      if (document.value.metadata.tagsInput) {
+        metadata.tags = document.value.metadata.tagsInput
+          .split(',')
+          .map(t => t.trim())
+          .filter(t => t)
+      }
+      
+      if (document.value.metadata.lat && document.value.metadata.lon) {
+        metadata.coordinates = {
+          lat: document.value.metadata.lat,
+          lon: document.value.metadata.lon
+        }
+      }
+
+      // Submit to API
+      const response = await api.post('/documents/add', {
+        filename: document.value.filename,
+        content: document.value.content,
+        metadata: metadata
+      })
+
+      successMessage.value = response.data.message
     }
-
-    // Submit to API
-    const response = await api.post('/documents/add', {
-      filename: document.value.filename,
-      content: document.value.content,
-      metadata: metadata
-    })
-
-    successMessage.value = response.data.message
     
     // Emit success and close after delay
     setTimeout(() => {
@@ -415,5 +598,135 @@ const handleSubmit = async () => {
   border-radius: 8px;
   color: var(--error);
   font-weight: 500;
+}
+
+/* Upload Method Selector - Tab Style */
+.upload-method-selector {
+  display: flex;
+  gap: 0;
+  background: var(--background);
+  border-radius: 10px;
+  padding: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.method-btn {
+  flex: 1;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.method-btn:hover:not(.active) {
+  color: var(--text-primary);
+  background: rgba(79, 70, 229, 0.05);
+}
+
+.method-btn.active {
+  background: var(--primary-color);
+  color: white;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+}
+
+.method-btn:active {
+  transform: scale(0.98);
+}
+
+/* File List Styles */
+.files-list {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  background: var(--background);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.file-item:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.1);
+}
+
+.file-item-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.file-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.file-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-meta {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.remove-file-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.25rem;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.remove-file-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
 }
 </style>

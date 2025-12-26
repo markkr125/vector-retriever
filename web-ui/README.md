@@ -19,10 +19,11 @@ The main interface features:
 ![Add Document](../docs/screenshots/webui-add-document.png)
 
 Upload new documents directly from the browser:
-- Support for structured and unstructured documents
-- Optional metadata fields
+- **Text Input**: Direct content entry with optional metadata
+- **File Upload**: Support for multiple formats (TXT, JSON, PDF, DOCX, DOC)
 - Real-time word/character count
 - Instant embedding and indexing
+- Automatic metadata extraction from file content
 
 ## Features
 
@@ -104,6 +105,48 @@ The Express server provides these endpoints:
 - `POST /api/search/hybrid` - Hybrid search
 - `POST /api/search/location` - Location-based search
 - `POST /api/search/geo` - Geo-radius search
+- `POST /api/documents/add` - Add document (text input)
+- `POST /api/documents/upload` - Upload document file
+
+## Document Upload
+
+The web UI supports uploading documents in multiple formats:
+
+### Supported File Formats
+
+- **TXT**: Plain text files
+- **JSON**: Structured data with optional metadata fields
+- **PDF**: Extracts text content and page count
+- **DOCX**: Microsoft Word documents (modern format)
+- **DOC**: Microsoft Word documents (legacy format - best effort)
+
+### Upload Methods
+
+**Method 1: Text Input**
+1. Click "Add Document" button
+2. Select "Text Input" mode
+3. Enter filename and content
+4. Add optional metadata (category, location, tags, etc.)
+5. Click Upload
+
+**Method 2: File Upload**
+1. Click "Add Document" button
+2. Select "File Upload" mode
+3. Choose file (max 10MB)
+4. Optionally add/override metadata
+5. Click Upload
+
+### Metadata Extraction
+
+The system automatically extracts metadata from file content:
+- **Category**: Hotel, restaurant, attraction, technology, etc.
+- **Location**: City names and geographic references
+- **Tags**: Keywords and descriptive terms
+- **Ratings**: Numerical ratings (0-5 scale)
+- **Prices**: Price information
+- **Coordinates**: Latitude/longitude if present
+
+You can also manually specify metadata which will override automatic extraction.
 
 ## Project Structure
 

@@ -122,7 +122,7 @@
         <transition name="fade">
           <div v-if="expandedIds.has(result.id)" class="full-content">
             <h4>Full Content</h4>
-            <pre class="content-text">{{ result.payload.content }}</pre>
+            <div class="content-markdown" v-html="renderMarkdown(result.payload.content)"></div>
             
             <!-- All Metadata -->
             <div class="all-metadata">
@@ -144,6 +144,7 @@
 </template>
 
 <script setup>
+import { marked } from 'marked'
 import { computed, ref } from 'vue'
 
 const props = defineProps({
@@ -172,6 +173,16 @@ const truncateContent = (content, maxLength) => {
   if (!content) return ''
   if (content.length <= maxLength) return content
   return content.substring(0, maxLength) + '...'
+}
+
+const renderMarkdown = (content) => {
+  if (!content) return ''
+  try {
+    return marked(content, { breaks: true, gfm: true })
+  } catch (e) {
+    console.error('Markdown rendering error:', e)
+    return content
+  }
 }
 
 const toggleExpand = (id) => {
@@ -321,6 +332,8 @@ const toggleExpand = (id) => {
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 1rem;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .metadata-grid {
@@ -408,8 +421,127 @@ const toggleExpand = (id) => {
   line-height: 1.6;
   white-space: pre-wrap;
   word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
   overflow-x: auto;
+  max-width: 100%;
   color: var(--text-primary);
+}
+
+.content-markdown {
+  background: var(--background);
+  padding: 1.5rem;
+  border-radius: 8px;
+  line-height: 1.8;
+  color: var(--text-primary);
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Markdown content styling */
+.content-markdown h1,
+.content-markdown h2,
+.content-markdown h3,
+.content-markdown h4,
+.content-markdown h5,
+.content-markdown h6 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.content-markdown h1 { font-size: 1.75rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem; }
+.content-markdown h2 { font-size: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.4rem; }
+.content-markdown h3 { font-size: 1.25rem; }
+.content-markdown h4 { font-size: 1.1rem; }
+.content-markdown h5 { font-size: 1rem; }
+.content-markdown h6 { font-size: 0.9rem; color: var(--text-secondary); }
+
+.content-markdown p {
+  margin-bottom: 1rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.content-markdown ul,
+.content-markdown ol {
+  margin-bottom: 1rem;
+  padding-left: 2rem;
+}
+
+.content-markdown li {
+  margin-bottom: 0.5rem;
+}
+
+.content-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  overflow-x: auto;
+  display: block;
+}
+
+.content-markdown th,
+.content-markdown td {
+  border: 1px solid var(--border-color);
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.content-markdown th {
+  background: var(--background);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.content-markdown tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.content-markdown code {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+.content-markdown pre {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.content-markdown pre code {
+  background: none;
+  padding: 0;
+}
+
+.content-markdown blockquote {
+  border-left: 4px solid var(--primary-color);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.content-markdown hr {
+  border: none;
+  border-top: 2px solid var(--border-color);
+  margin: 2rem 0;
+}
+
+.content-markdown a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.content-markdown a:hover {
+  text-decoration: underline;
 }
 
 .all-metadata {

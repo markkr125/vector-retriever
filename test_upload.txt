@@ -1,0 +1,12 @@
+Test Document for File Upload
+
+This is a test document to verify the multi-format file upload functionality.
+
+Key Features:
+- Support for TXT files
+- Support for JSON files
+- Support for PDF files
+- Support for DOCX files
+- Support for DOC files
+
+The document should be embedded and stored in Qdrant with proper metadata extraction.
