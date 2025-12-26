@@ -7,6 +7,7 @@ Advanced vector database experiment demonstrating **Qdrant's powerful features**
 - [Key Features Demonstrated](#-key-features-demonstrated)
 - [Prerequisites](#-prerequisites)
 - [Quick Start](#-quick-start)
+- [Web UI](#-web-ui)
 - [Basic Usage](#-basic-usage)
 - [Usage Examples](#-usage-examples)
 - [Advanced Search Examples](#-advanced-search-examples)
@@ -154,6 +155,63 @@ node index.js geo 48.8566 2.3522 50000 "tourist attractions"
 **Interactive Demo** (showcases all features):
 ```bash
 npm run demo
+```
+
+**Advanced Examples** (complex filtering):
+```bash
+node examples.js
+```
+
+## 🌐 Web UI
+
+A modern web interface is available for interactive searching!
+
+### Start Web UI
+
+```bash
+# One command to start everything
+npm run webui
+```
+
+This will:
+1. Start the API server (port 3001)
+2. Start the Vue.js frontend (port 5173)
+3. Open your browser to http://localhost:5173
+
+### Features
+
+- **Multiple Search Types**: Semantic, Hybrid, Location, Geo-radius
+- **Advanced Filtering**: Category, price range, ratings, tags, document type
+- **Interactive Results**: Expandable cards with full metadata
+- **Real-time Search**: Instant results as you type
+- **Beautiful UI**: Modern, responsive design
+
+### Manual Start
+
+Start services separately:
+
+```bash
+# Terminal 1: API Server
+npm run server
+
+# Terminal 2: Vue UI
+cd web-ui && npm run dev
+```
+
+See [web-ui/README.md](web-ui/README.md) for detailed documentation.
+
+## 📖 Basic Usage
+
+### Command Line Interface
+
+**Semantic Search** (dense vectors only):
+```bash
+npm run search "luxury hotels with excellent service"
+```
+
+**Hybrid Search** (semantic + keyword):
+```bash
+npm run hybrid "italian restaurant with wine cellar"
 ```
 
 **Advanced Examples** (complex filtering):
@@ -525,8 +583,10 @@ curl http://localhost:11434/api/embed -d '{
 ```
 ollama-qdrant-experiment/
 ├── index.js                          # Main application
+├── server.js                         # Express API server
 ├── examples.js                       # 7 advanced filtering examples
 ├── mixed_examples.js                 # Structured vs unstructured demos
+├── start-webui.sh                    # Web UI startup script
 ├── package.json                      # Dependencies
 ├── .env                              # Configuration (gitignored)
 ├── .env.example                      # Template configuration
@@ -538,6 +598,19 @@ ollama-qdrant-experiment/
 │   ├── MIXED_DATASET.md              # Mixed dataset handling guide
 │   ├── LOCATION_SEARCH_EXAMPLES.md   # Location/geo query examples
 │   └── ADVANCED_QUERIES.md           # Complex filtering patterns
+├── web-ui/                           # Vue.js web interface
+│   ├── src/
+│   │   ├── App.vue                   # Main Vue component
+│   │   ├── main.js                   # Vue entry point
+│   │   ├── style.css                 # Global styles
+│   │   ├── api.js                    # API client
+│   │   └── components/
+│   │       ├── SearchForm.vue        # Search form component
+│   │       └── ResultsList.vue       # Results display component
+│   ├── index.html                    # HTML entry point
+│   ├── vite.config.js                # Vite configuration
+│   ├── package.json                  # UI dependencies
+│   └── README.md                     # Web UI documentation
 └── data/                             # Document corpus (27 files)
     ├── hotel_*.txt                   # Structured hotels (4)
     ├── restaurant_*.txt              # Structured restaurants (4)

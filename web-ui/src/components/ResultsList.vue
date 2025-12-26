@@ -1,0 +1,423 @@
+<template>
+  <div class="results-list">
+    <!-- Header -->
+    <div class="results-header card">
+      <div v-if="loading" class="loading-state">
+        <span class="loading"></span>
+        <span>Searching...</span>
+      </div>
+      <div v-else-if="query" class="results-info">
+        <h2 class="results-title">
+          Search Results
+        </h2>
+        <div class="results-meta">
+          <span class="badge badge-primary">{{ searchTypeLabel }}</span>
+          <span class="results-count">{{ results.length }} results</span>
+          <span class="query-text">"{{ query }}"</span>
+        </div>
+      </div>
+      <div v-else class="empty-state">
+        <span class="empty-icon">🔍</span>
+        <h3>Ready to search</h3>
+        <p>Enter your query and configure search settings to begin</p>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <transition-group name="slide-up" tag="div" class="results-grid">
+      <div 
+        v-for="(result, index) in results" 
+        :key="result.id"
+        class="result-card card"
+      >
+        <!-- Score Badge -->
+        <div class="result-header">
+          <div class="result-rank">#{{ index + 1 }}</div>
+          <div class="result-score">
+            <div class="score-bar">
+              <div 
+                class="score-fill" 
+                :style="{ width: (result.score * 100) + '%' }"
+              ></div>
+            </div>
+            <span class="score-text">{{ (result.score * 100).toFixed(1) }}%</span>
+          </div>
+        </div>
+
+        <!-- Metadata -->
+        <div class="result-metadata">
+          <h3 class="result-filename">{{ result.payload.filename }}</h3>
+          
+          <div class="metadata-grid">
+            <div v-if="result.payload.category" class="meta-item">
+              <span class="meta-label">Category:</span>
+              <span class="badge badge-secondary">{{ result.payload.category }}</span>
+            </div>
+            
+            <div v-if="result.payload.location" class="meta-item">
+              <span class="meta-label">Location:</span>
+              <span class="meta-value">📍 {{ result.payload.location }}</span>
+            </div>
+            
+            <div v-if="result.payload.rating" class="meta-item">
+              <span class="meta-label">Rating:</span>
+              <span class="meta-value">⭐ {{ result.payload.rating }}/5</span>
+            </div>
+            
+            <div v-if="result.payload.price" class="meta-item">
+              <span class="meta-label">Price:</span>
+              <span class="meta-value">💰 ${{ result.payload.price }}</span>
+            </div>
+            
+            <div v-if="result.payload.date" class="meta-item">
+              <span class="meta-label">Date:</span>
+              <span class="meta-value">📅 {{ result.payload.date }}</span>
+            </div>
+          </div>
+
+          <!-- Tags -->
+          <div v-if="result.payload.tags && result.payload.tags.length > 0" class="tags">
+            <span 
+              v-for="tag in result.payload.tags" 
+              :key="tag"
+              class="tag"
+            >
+              {{ tag }}
+            </span>
+          </div>
+
+          <!-- Document Type Indicators -->
+          <div class="doc-type-badges">
+            <span 
+              v-if="result.payload.is_unstructured" 
+              class="badge badge-secondary"
+              title="Plain text document without structured metadata"
+            >
+              📄 Unstructured
+            </span>
+            <span 
+              v-if="result.payload.has_structured_metadata" 
+              class="badge badge-primary"
+              title="Document with rich metadata"
+            >
+              📊 Structured
+            </span>
+          </div>
+        </div>
+
+        <!-- Content Preview -->
+        <div class="result-content">
+          <p>{{ truncateContent(result.payload.content, 300) }}</p>
+        </div>
+
+        <!-- Expand Button -->
+        <button 
+          @click="toggleExpand(result.id)"
+          class="btn btn-secondary expand-btn"
+        >
+          {{ expandedIds.has(result.id) ? '▲ Show Less' : '▼ Show More' }}
+        </button>
+
+        <!-- Full Content (when expanded) -->
+        <transition name="fade">
+          <div v-if="expandedIds.has(result.id)" class="full-content">
+            <h4>Full Content</h4>
+            <pre class="content-text">{{ result.payload.content }}</pre>
+            
+            <!-- All Metadata -->
+            <div class="all-metadata">
+              <h4>All Metadata</h4>
+              <pre class="metadata-json">{{ JSON.stringify(result.payload, null, 2) }}</pre>
+            </div>
+          </div>
+        </transition>
+      </div>
+    </transition-group>
+
+    <!-- No Results -->
+    <div v-if="!loading && query && results.length === 0" class="no-results card">
+      <span class="empty-icon">🔍</span>
+      <h3>No results found</h3>
+      <p>Try adjusting your search query or filters</p>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { computed, ref } from 'vue'
+
+const props = defineProps({
+  results: {
+    type: Array,
+    default: () => []
+  },
+  loading: Boolean,
+  query: String,
+  searchType: String
+})
+
+const expandedIds = ref(new Set())
+
+const searchTypeLabel = computed(() => {
+  const labels = {
+    semantic: '🧠 Semantic Search',
+    hybrid: '🔀 Hybrid Search',
+    location: '📍 Location Search',
+    geo: '🌍 Geo-Radius Search'
+  }
+  return labels[props.searchType] || 'Search'
+})
+
+const truncateContent = (content, maxLength) => {
+  if (!content) return ''
+  if (content.length <= maxLength) return content
+  return content.substring(0, maxLength) + '...'
+}
+
+const toggleExpand = (id) => {
+  if (expandedIds.value.has(id)) {
+    expandedIds.value.delete(id)
+  } else {
+    expandedIds.value.add(id)
+  }
+}
+</script>
+
+<style scoped>
+.results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.results-header {
+  padding: 2rem;
+}
+
+.loading-state {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  justify-content: center;
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+}
+
+.results-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.results-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.results-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.results-count {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.query-text {
+  color: var(--primary-color);
+  font-weight: 500;
+  font-style: italic;
+}
+
+.empty-state,
+.no-results {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--text-secondary);
+}
+
+.empty-icon {
+  font-size: 4rem;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.empty-state h3,
+.no-results h3 {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.results-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.result-card {
+  transition: all 0.3s;
+}
+
+.result-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.result-rank {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary-color);
+  min-width: 3rem;
+}
+
+.result-score {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.score-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--border-color);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.score-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+  transition: width 0.6s ease-out;
+}
+
+.score-text {
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 4rem;
+  text-align: right;
+}
+
+.result-metadata {
+  margin-bottom: 1rem;
+}
+
+.result-filename {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+.metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.meta-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.meta-value {
+  color: var(--text-primary);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tag {
+  padding: 0.25rem 0.75rem;
+  background: var(--background);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.doc-type-badges {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.result-content {
+  padding: 1rem;
+  background: var(--background);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.result-content p {
+  color: var(--text-primary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.expand-btn {
+  width: 100%;
+}
+
+.full-content {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.full-content h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+}
+
+.content-text,
+.metadata-json {
+  background: var(--background);
+  padding: 1rem;
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
+  color: var(--text-primary);
+}
+
+.all-metadata {
+  margin-top: 1.5rem;
+}
+
+.metadata-json {
+  max-height: 400px;
+  overflow-y: auto;
+}
+</style>

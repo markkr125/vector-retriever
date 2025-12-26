@@ -10,7 +10,9 @@
     "hybrid": "node index.js hybrid",
     "demo": "node index.js demo",
     "examples": "node examples.js",
-    "mixed": "node mixed_examples.js"
+    "mixed": "node mixed_examples.js",
+    "webui": "./start-webui.sh",
+    "server": "node server.js"
   },
   "keywords": [
     "qdrant",
@@ -27,7 +29,9 @@
   "dependencies": {
     "@qdrant/js-client-rest": "^1.8.2",
     "axios": "^1.6.5",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.3",
+    "express": "^4.18.2",
     "glob": "^10.3.10"
   },
   "engines": {
