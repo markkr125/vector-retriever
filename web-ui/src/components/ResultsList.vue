@@ -32,7 +32,7 @@
       >
         <!-- Score Badge -->
         <div class="result-header">
-          <div class="result-rank">#{{ index + 1 }}</div>
+          <div class="result-rank">#{{ (currentPage - 1) * limit + index + 1 }}</div>
           <div class="result-score">
             <div class="score-bar">
               <div 
@@ -140,6 +140,40 @@
       <h3>No results found</h3>
       <p>Try adjusting your search query or filters</p>
     </div>
+
+    <!-- Pagination -->
+    <div v-if="!loading && results.length > 0" class="pagination card">
+      <button 
+        @click="emit('page-change', currentPage - 1)"
+        :disabled="currentPage === 1"
+        class="btn btn-secondary pagination-btn"
+      >
+        ← Previous
+      </button>
+      
+      <div class="page-numbers">
+        <button
+          v-for="(page, index) in pageNumbers"
+          :key="index"
+          @click="typeof page === 'number' ? emit('page-change', page) : null"
+          :class="['page-number-btn', { 
+            active: page === currentPage,
+            ellipsis: page === '...'
+          }]"
+          :disabled="page === '...'"
+        >
+          {{ page }}
+        </button>
+      </div>
+      
+      <button 
+        @click="emit('page-change', currentPage + 1)"
+        :disabled="!hasNextPage"
+        class="btn btn-secondary pagination-btn"
+      >
+        Next →
+      </button>
+    </div>
   </div>
 </template>
 
@@ -154,10 +188,68 @@ const props = defineProps({
   },
   loading: Boolean,
   query: String,
-  searchType: String
+  searchType: String,
+  currentPage: {
+    type: Number,
+    default: 1
+  },
+  totalResults: {
+    type: Number,
+    default: 0
+  },
+  limit: {
+    type: Number,
+    default: 10
+  }
 })
 
+const emit = defineEmits(['page-change'])
+
 const expandedIds = ref(new Set())
+
+const totalPages = computed(() => {
+  if (!props.totalResults || !props.limit) return 1
+  return Math.ceil(props.totalResults / props.limit)
+})
+
+const hasNextPage = computed(() => {
+  return props.currentPage < totalPages.value
+})
+
+const pageNumbers = computed(() => {
+  const pages = []
+  const total = totalPages.value
+  const current = props.currentPage
+  
+  if (total <= 7) {
+    // Show all pages if 7 or fewer
+    for (let i = 1; i <= total; i++) {
+      pages.push(i)
+    }
+  } else {
+    // Always show first page
+    pages.push(1)
+    
+    if (current <= 3) {
+      // Near start: [1] [2] [3] [4] ... [total]
+      pages.push(2, 3, 4)
+      pages.push('...')
+      pages.push(total)
+    } else if (current >= total - 2) {
+      // Near end: [1] ... [total-3] [total-2] [total-1] [total]
+      pages.push('...')
+      pages.push(total - 3, total - 2, total - 1, total)
+    } else {
+      // Middle: [1] ... [current-1] [current] [current+1] ... [total]
+      pages.push('...')
+      pages.push(current - 1, current, current + 1)
+      pages.push('...')
+      pages.push(total)
+    }
+  }
+  
+  return pages
+})
 
 const searchTypeLabel = computed(() => {
   const labels = {
@@ -178,10 +270,14 @@ const truncateContent = (content, maxLength) => {
 const renderMarkdown = (content) => {
   if (!content) return ''
   try {
-    return marked(content, { breaks: true, gfm: true })
+    // In marked v17+, options are passed directly to marked()
+    return marked.parse(content, {
+      breaks: true,
+      gfm: true
+    })
   } catch (e) {
     console.error('Markdown rendering error:', e)
-    return content
+    return content.replace(/</g, '&lt;').replace(/>/g, '&gt;')
   }
 }
 
@@ -551,5 +647,63 @@ const toggleExpand = (id) => {
 .metadata-json {
   max-height: 400px;
   overflow-y: auto;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.pagination-btn {
+  min-width: 120px;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-numbers {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.page-number-btn {
+  min-width: 40px;
+  height: 40px;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  background: white;
+  color: var(--text-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.page-number-btn:hover:not(.ellipsis):not(.active) {
+  background: var(--background);
+  border-color: var(--primary-color);
+}
+
+.page-number-btn.active {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.page-number-btn.ellipsis {
+  border: none;
+  background: transparent;
+  cursor: default;
+}
+
+.page-number-btn:disabled {
+  cursor: default;
 }
 </style>
