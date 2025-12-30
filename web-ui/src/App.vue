@@ -36,6 +36,10 @@
           @filter-category="handleFilterCategory"
           @filter-location="handleFilterLocation"
           @filter-tag="handleFilterTag"
+          @filter-pii-any="handleFilterPIIAny"
+          @filter-pii-type="handleFilterPIIType"
+          @filter-pii-risk="handleFilterPIIRisk"
+          @bulk-scan-pii="handleBulkScanPII"
           @clear-filter="handleClearFilter"
         />
         
@@ -64,6 +68,9 @@
               @page-change="handlePageChange"
               @find-similar="handleFindSimilar"
               @clear-similar="handleClearSimilar"
+              @show-pii-modal="handleShowPIIModal"
+              @refresh-results="performSearch"
+              @scan-complete="handleScanComplete"
             />
           </div>
         </div>
@@ -82,6 +89,29 @@
       @close="showUploadModal = false"
       @success="handleUploadSuccess"
     />
+
+    <!-- PII Details Modal -->
+    <PIIDetailsModal
+      v-if="showPIIModal && currentPIIData"
+      :filename="currentPIIData.filename"
+      :pii-types="currentPIIData.piiTypes"
+      :pii-details="currentPIIData.piiDetails"
+      :risk-level="currentPIIData.riskLevel"
+      :scan-date="currentPIIData.scanDate"
+      @close="closePIIModal"
+    />
+
+    <!-- Scan Notification -->
+    <ScanNotification
+      :visible="showScanNotification"
+      :success="scanNotificationData.success"
+      :pii-detected="scanNotificationData.piiDetected"
+      :message="scanNotificationData.message"
+      :pii-types="scanNotificationData.piiTypes"
+      :pii-count="scanNotificationData.piiCount"
+      :error="scanNotificationData.error"
+      @close="showScanNotification = false"
+    />
   </div>
 </template>
 
@@ -89,7 +119,9 @@
 import { computed, onMounted, ref } from 'vue'
 import api from './api'
 import FacetBar from './components/FacetBar.vue'
+import PIIDetailsModal from './components/PIIDetailsModal.vue'
 import ResultsList from './components/ResultsList.vue'
+import ScanNotification from './components/ScanNotification.vue'
 import SearchForm from './components/SearchForm.vue'
 import UploadModal from './components/UploadModal.vue'
 
@@ -100,6 +132,10 @@ const currentQuery = ref('')
 const searchType = ref('')
 const stats = ref(null)
 const showUploadModal = ref(false)
+const showPIIModal = ref(false)
+const currentPIIData = ref(null)
+const showScanNotification = ref(false)
+const scanNotificationData = ref({})
 const searchFormRef = ref(null)
 const activeFilters = ref([]) // Array of { type, value }
 const lastSearchParams = ref(null) // Track last search parameters
@@ -548,6 +584,175 @@ const handleFilterTag = async (tag) => {
     await handleSearch(searchParams)
   } else if (activeFilters.value.length > 0) {
     currentQuery.value = activeFilters.value.map(f => `${f.type}: ${f.value}`).join(', ')
+    searchType.value = 'facet'
+    const searchParams = {
+      searchType: 'semantic',
+      query: '',
+      limit: searchFormRef.value?.limit || 10,
+      page: 1,
+      filters
+    }
+    await handleSearch(searchParams)
+  } else {
+    results.value = []
+    totalResults.value = 0
+    currentQuery.value = ''
+    searchType.value = ''
+  }
+}
+
+// Handle PII filter - any PII detected
+const handleFilterPIIAny = async () => {
+  const existingIndex = activeFilters.value.findIndex(f => f.type === 'pii_any')
+  if (existingIndex >= 0) {
+    activeFilters.value.splice(existingIndex, 1)
+  } else {
+    activeFilters.value = activeFilters.value.filter(f => f.type !== 'pii_type' && f.type !== 'pii_risk')
+    activeFilters.value.push({ type: 'pii_any', value: 'Any Sensitive Data' })
+  }
+  
+  const filters = {
+    must: activeFilters.value.map(f => ({
+      key: f.type === 'tag' ? 'tags' : (f.type === 'pii_any' ? 'pii_detected' : f.type),
+      match: f.type === 'tag' ? { any: [f.value] } : { value: f.type === 'pii_any' ? true : f.value }
+    }))
+  }
+  
+  await performFacetSearch(filters)
+}
+
+// Handle PII filter - specific type
+const handleFilterPIIType = async (piiType) => {
+  activeFilters.value = activeFilters.value.filter(f => f.type !== 'pii_any')
+  
+  const existingIndex = activeFilters.value.findIndex(f => f.type === 'pii_type' && f.value === piiType)
+  if (existingIndex >= 0) {
+    activeFilters.value.splice(existingIndex, 1)
+  } else {
+    activeFilters.value.push({ type: 'pii_type', value: piiType })
+  }
+  
+  const filters = {
+    must: activeFilters.value.map(f => ({
+      key: f.type === 'tag' ? 'tags' : (f.type === 'pii_type' ? 'pii_types' : f.type),
+      match: f.type === 'tag' || f.type === 'pii_type' ? { any: [f.value] } : { value: f.value }
+    }))
+  }
+  
+  await performFacetSearch(filters)
+}
+
+// Handle PII filter - risk level
+const handleFilterPIIRisk = async (riskLevel) => {
+  const existingIndex = activeFilters.value.findIndex(f => f.type === 'pii_risk')
+  if (existingIndex >= 0) {
+    // Toggle off if same risk level selected
+    if (activeFilters.value[existingIndex].value === riskLevel) {
+      activeFilters.value.splice(existingIndex, 1)
+    } else {
+      // Replace with new risk level
+      activeFilters.value[existingIndex] = { type: 'pii_risk', value: riskLevel }
+    }
+  } else {
+    activeFilters.value.push({ type: 'pii_risk', value: riskLevel })
+  }
+  
+  // Special handling for "none" - filter by pii_detected = false
+  const filters = {
+    must: activeFilters.value.map(f => {
+      if (f.type === 'pii_risk') {
+        if (f.value === 'none') {
+          return { key: 'pii_detected', match: { value: false } }
+        } else {
+          return { key: 'pii_risk_level', match: { value: f.value } }
+        }
+      } else if (f.type === 'tag') {
+        return { key: 'tags', match: { any: [f.value] } }
+      } else if (f.type === 'pii_type') {
+        return { key: 'pii_types', match: { any: [f.value] } }
+      } else {
+        return { key: f.type, match: { value: f.value } }
+      }
+    })
+  }
+  
+  await performFacetSearch(filters)
+}
+
+// Handle bulk PII scan
+const handleBulkScanPII = async () => {
+  if (!confirm('Scan all documents for sensitive data? This may take a while.')) {
+    return
+  }
+  
+  try {
+    loading.value = true
+    const response = await api.post('/documents/scan-all-pii')
+    alert(`✅ ${response.data.message}`)
+    
+    await loadStats()
+    if (currentQuery.value) {
+      await performSearch()
+    }
+  } catch (error) {
+    console.error('Bulk scan error:', error)
+    alert(`❌ Failed: ${error.response?.data?.error || error.message}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+// Handle show PII modal
+const handleShowPIIModal = (data) => {
+  currentPIIData.value = data
+  showPIIModal.value = true
+}
+
+// Handle close PII modal
+const closePIIModal = () => {
+  showPIIModal.value = false
+  currentPIIData.value = null
+}
+
+// Handle scan complete notification
+const handleScanComplete = (data) => {
+  scanNotificationData.value = data
+  showScanNotification.value = true
+}
+
+// Perform search again to refresh results (e.g., after PII scan)
+const performSearch = async () => {
+  // If we have last search params, re-run the same search
+  if (lastSearchParams.value && lastSearchParams.value.query) {
+    await handleSearch(lastSearchParams.value)
+  } else if (similarDocumentId.value) {
+    // If in Find Similar mode, refresh that
+    await handleFindSimilar(similarDocumentId.value)
+  } else if (activeFilters.value.length > 0) {
+    // If we have active filters, refresh the filtered search
+    const filters = {
+      must: activeFilters.value.map(f => ({
+        key: f.type === 'tag' ? 'tags' : f.type,
+        match: f.type === 'tag' ? { any: [f.value] } : { value: f.value }
+      }))
+    }
+    await performFacetSearch(filters)
+  }
+  // Note: If no search is active, we don't refresh anything
+}
+
+// Helper to perform facet search
+const performFacetSearch = async (filters) => {
+  if (lastSearchParams.value && lastSearchParams.value.query) {
+    const searchParams = {
+      ...lastSearchParams.value,
+      filters: filters.must.length > 0 ? filters : undefined
+    }
+    const filterText = activeFilters.value.length > 0 ? ` (${activeFilters.value.map(f => f.value).join(', ')})` : ''
+    currentQuery.value = `${lastSearchParams.value.query}${filterText}`
+    await handleSearch(searchParams)
+  } else if (activeFilters.value.length > 0) {
+    currentQuery.value = activeFilters.value.map(f => `${f.value}`).join(', ')
     searchType.value = 'facet'
     const searchParams = {
       searchType: 'semantic',

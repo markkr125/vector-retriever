@@ -7,6 +7,7 @@ const pdfParse = require('pdf-parse');
 const pdf2md = require('@opendocsg/pdf2md');
 const TurndownService = require('turndown');
 const { QdrantClient } = require('@qdrant/js-client-rest');
+const { PIIDetectorFactory } = require('./pii-detector');
 require('dotenv').config({ quiet: true });
 
 // Polyfill Promise.withResolvers for older Node.js versions
@@ -53,6 +54,55 @@ const QDRANT_URL = process.env.QDRANT_URL;
 const COLLECTION_NAME = process.env.COLLECTION_NAME || 'documents';
 const MAX_FILE_SIZE_MB = parseInt(process.env.MAX_FILE_SIZE_MB || '10', 10);
 const CATEGORIZATION_MODEL = process.env.CATEGORIZATION_MODEL || '';
+
+// PII Detection Configuration
+const PII_DETECTION_ENABLED = process.env.PII_DETECTION_ENABLED === 'true';
+const PII_DETECTION_METHOD = process.env.PII_DETECTION_METHOD || 'hybrid'; // ollama, regex, hybrid
+const PII_DETECTION_MODEL = process.env.PII_DETECTION_MODEL || CATEGORIZATION_MODEL || MODEL;
+
+// Initialize PII Detector
+let piiDetector = null;
+if (PII_DETECTION_ENABLED) {
+  piiDetector = PIIDetectorFactory.create(
+    PII_DETECTION_METHOD,
+    OLLAMA_URL,
+    AUTH_TOKEN,
+    PII_DETECTION_MODEL
+  );
+  console.log(`PII Detection enabled using ${PII_DETECTION_METHOD} method`);
+}
+
+/**
+ * Detect PII in content
+ */
+async function detectPII(content) {
+  if (!PII_DETECTION_ENABLED || !piiDetector) {
+    return {
+      hasPII: false,
+      piiTypes: [],
+      piiDetails: [],
+      riskLevel: 'low',
+      detectionMethod: 'disabled',
+      scanTimestamp: new Date().toISOString(),
+      processingTimeMs: 0
+    };
+  }
+  
+  try {
+    return await piiDetector.detect(content);
+  } catch (error) {
+    console.error('PII detection error:', error);
+    return {
+      hasPII: false,
+      piiTypes: [],
+      piiDetails: [],
+      riskLevel: 'low',
+      detectionMethod: 'error',
+      scanTimestamp: new Date().toISOString(),
+      processingTimeMs: 0
+    };
+  }
+}
 
 // Configure multer for file uploads
 const upload = multer({ 
@@ -477,7 +527,9 @@ function formatTable(rows) {
 app.get('/api/config', (req, res) => {
   res.json({
     maxFileSizeMB: MAX_FILE_SIZE_MB,
-    categorizationEnabled: !!CATEGORIZATION_MODEL
+    categorizationEnabled: !!CATEGORIZATION_MODEL,
+    piiDetectionEnabled: PII_DETECTION_ENABLED,
+    piiDetectionMethod: PII_DETECTION_METHOD
   });
 });
 
@@ -534,6 +586,11 @@ app.get('/api/collection/:name/info', async (req, res) => {
 app.post('/api/search/semantic', async (req, res) => {
   try {
     const { query, limit = 10, offset = 0, filters } = req.body;
+    
+    // Debug: Log filters
+    if (filters) {
+      console.log('Semantic search filters:', JSON.stringify(filters, null, 2));
+    }
     
     let results;
     let totalEstimate;
@@ -608,6 +665,11 @@ app.post('/api/search/hybrid', async (req, res) => {
   try {
     const { query, limit = 10, offset = 0, denseWeight = 0.7, filters } = req.body;
     
+    // Debug: Log filters
+    if (filters) {
+      console.log('Hybrid search filters:', JSON.stringify(filters, null, 2));
+    }
+    
     if (!query) {
       return res.status(400).json({ error: 'Query is required' });
     }
@@ -629,14 +691,67 @@ app.post('/api/search/hybrid', async (req, res) => {
       with_payload: true
     };
     
+    // Apply filters directly if in Qdrant format, otherwise build them
     if (filters) {
-      searchParams.filter = filters;
+      // Check if filters are already in Qdrant format (has 'must' array)
+      if (filters.must && Array.isArray(filters.must)) {
+        searchParams.filter = filters;
+      } else {
+        // Legacy format: build filters from flat object
+        const qdrantFilter = { must: [] };
+        
+        if (filters.category) {
+          qdrantFilter.must.push({
+            key: 'category',
+            match: { value: filters.category }
+          });
+        }
+        
+        if (filters.location) {
+          qdrantFilter.must.push({
+            key: 'location',
+            match: { value: filters.location }
+          });
+        }
+        
+        if (filters.tags && filters.tags.length > 0) {
+          qdrantFilter.must.push({
+            key: 'tags',
+            match: { any: filters.tags }
+          });
+        }
+        
+        if (filters.pii_detected !== undefined) {
+          qdrantFilter.must.push({
+            key: 'pii_detected',
+            match: { value: filters.pii_detected }
+          });
+        }
+        
+        if (filters.pii_types && filters.pii_types.length > 0) {
+          qdrantFilter.must.push({
+            key: 'pii_types',
+            match: { any: filters.pii_types }
+          });
+        }
+        
+        if (filters.pii_risk_level) {
+          qdrantFilter.must.push({
+            key: 'pii_risk_level',
+            match: { value: filters.pii_risk_level }
+          });
+        }
+        
+        if (qdrantFilter.must.length > 0) {
+          searchParams.filter = qdrantFilter;
+        }
+      }
     }
     
     const results = await qdrantClient.search(COLLECTION_NAME, searchParams);
     
     // Get total count with filter
-    const totalEstimate = await countFilteredDocuments(filters);
+    const totalEstimate = await countFilteredDocuments(searchParams.filter);
     
     res.json({
       query,
@@ -952,6 +1067,10 @@ app.get('/api/facets', async (req, res) => {
     const categoryCount = {};
     const locationCount = {};
     const tagCount = {};
+    const piiTypeCount = {};
+    let totalWithPII = 0;
+    const riskLevels = { low: 0, medium: 0, high: 0, critical: 0 };
+    let totalPoints = 0;
     let hasMore = true;
     
     while (hasMore) {
@@ -962,6 +1081,8 @@ app.get('/api/facets', async (req, res) => {
       });
       
       scrollResult.points.forEach(point => {
+        totalPoints++;
+        
         // Count categories
         if (point.payload.category) {
           categoryCount[point.payload.category] = (categoryCount[point.payload.category] || 0) + 1;
@@ -977,6 +1098,23 @@ app.get('/api/facets', async (req, res) => {
           point.payload.tags.forEach(tag => {
             tagCount[tag] = (tagCount[tag] || 0) + 1;
           });
+        }
+        
+        // PII aggregation
+        if (point.payload.pii_detected) {
+          totalWithPII++;
+          
+          // Count risk levels
+          if (point.payload.pii_risk_level) {
+            riskLevels[point.payload.pii_risk_level] = (riskLevels[point.payload.pii_risk_level] || 0) + 1;
+          }
+          
+          // Count PII types
+          if (point.payload.pii_types && Array.isArray(point.payload.pii_types)) {
+            point.payload.pii_types.forEach(type => {
+              piiTypeCount[type] = (piiTypeCount[type] || 0) + 1;
+            });
+          }
         }
       });
       
@@ -998,10 +1136,24 @@ app.get('/api/facets', async (req, res) => {
       .sort((a, b) => b.count - a.count)
       .slice(0, 50); // Limit to top 50 tags
     
+    const piiTypes = Object.entries(piiTypeCount)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+    
+    // Add "none" count for documents without PII
+    riskLevels.none = totalPoints - totalWithPII;
+    
     res.json({
       categories,
       locations,
-      tags
+      tags,
+      piiStats: {
+        total: totalWithPII,
+        percentage: totalPoints > 0 ? ((totalWithPII / totalPoints) * 100).toFixed(1) : 0,
+        riskLevels
+      },
+      piiTypes,
+      totalDocuments: totalPoints
     });
   } catch (error) {
     console.error('Facets error:', error);
@@ -1157,6 +1309,27 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
       }
     }
 
+    // PII Detection - scan for sensitive information
+    if (PII_DETECTION_ENABLED) {
+      console.log('Scanning for PII...');
+      const piiResult = await detectPII(content);
+      
+      if (piiResult.hasPII) {
+        metadata.pii_detected = true;
+        metadata.pii_types = piiResult.piiTypes;
+        metadata.pii_details = piiResult.piiDetails;
+        metadata.pii_risk_level = piiResult.riskLevel;
+        metadata.pii_scan_date = piiResult.scanTimestamp;
+        metadata.pii_detection_method = piiResult.detectionMethod;
+        
+        console.log(`⚠️  PII detected: ${piiResult.piiTypes.join(', ')} (${piiResult.piiDetails.length} items)`);
+      } else {
+        metadata.pii_detected = false;
+        metadata.pii_scan_date = piiResult.scanTimestamp;
+        console.log('✓ No PII detected');
+      }
+    }
+
     // Automatic categorization if enabled and requested
     if (CATEGORIZATION_MODEL && req.body.auto_categorize === 'true') {
       console.log('Automatic categorization requested...');
@@ -1232,6 +1405,27 @@ app.post('/api/documents/add', async (req, res) => {
     
     console.log(`Adding document: ${filename}`);
     
+    // PII Detection - scan for sensitive information
+    if (PII_DETECTION_ENABLED) {
+      console.log('Scanning for PII...');
+      const piiResult = await detectPII(content);
+      
+      if (piiResult.hasPII) {
+        metadata.pii_detected = true;
+        metadata.pii_types = piiResult.piiTypes;
+        metadata.pii_details = piiResult.piiDetails;
+        metadata.pii_risk_level = piiResult.riskLevel;
+        metadata.pii_scan_date = piiResult.scanTimestamp;
+        metadata.pii_detection_method = piiResult.detectionMethod;
+        
+        console.log(`⚠️  PII detected: ${piiResult.piiTypes.join(', ')} (${piiResult.piiDetails.length} items)`);
+      } else {
+        metadata.pii_detected = false;
+        metadata.pii_scan_date = piiResult.scanTimestamp;
+        console.log('✓ No PII detected');
+      }
+    }
+    
     // Parse metadata from content
     const parsedMetadata = parseMetadataFromContent(filename, content, metadata);
     
@@ -1278,6 +1472,188 @@ app.post('/api/documents/add', async (req, res) => {
     res.status(500).json({ 
       error: error.message,
       details: 'Failed to add document'
+    });
+  }
+});
+
+/**
+ * POST /api/documents/:id/scan-pii
+ * Scan existing document for PII (retroactive scanning)
+ */
+app.post('/api/documents/:id/scan-pii', async (req, res) => {
+  try {
+    if (!PII_DETECTION_ENABLED) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'PII detection is not enabled on this server' 
+      });
+    }
+
+    const docId = parseInt(req.params.id);
+    
+    // Retrieve document from Qdrant
+    const docs = await qdrantClient.retrieve(COLLECTION_NAME, { 
+      ids: [docId],
+      with_payload: true,
+      with_vector: false
+    });
+    
+    if (!docs || docs.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Document not found' 
+      });
+    }
+    
+    const doc = docs[0];
+    
+    // Always allow rescanning - no time restrictions
+    console.log(`Scanning document ${doc.payload.filename} for PII...`);
+    
+    // Scan for PII
+    const piiResult = await detectPII(doc.payload.content);
+    
+    // Update document in Qdrant (only PII fields)
+    await qdrantClient.setPayload(COLLECTION_NAME, {
+      points: [docId],
+      payload: {
+        pii_detected: piiResult.hasPII,
+        pii_types: piiResult.piiTypes || [],
+        pii_details: piiResult.piiDetails || [],
+        pii_risk_level: piiResult.riskLevel || 'low',
+        pii_scan_date: piiResult.scanTimestamp,
+        pii_detection_method: piiResult.detectionMethod
+      }
+    });
+    
+    // Return friendly message
+    const message = piiResult.hasPII 
+      ? `⚠️ Found ${piiResult.piiTypes.length} type(s) of sensitive data in ${piiResult.piiDetails.length} location(s)`
+      : '✓ No sensitive data detected';
+    
+    res.json({
+      success: true,
+      piiDetected: piiResult.hasPII,
+      message: message,
+      piiTypes: piiResult.piiTypes,
+      riskLevel: piiResult.riskLevel,
+      detailsCount: piiResult.piiDetails.length,
+      filename: doc.payload.filename
+    });
+    
+  } catch (error) {
+    console.error('PII scan error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
+  }
+});
+
+/**
+ * POST /api/documents/scan-all-pii
+ * Scan all documents for PII (bulk retroactive scanning)
+ */
+app.post('/api/documents/scan-all-pii', async (req, res) => {
+  try {
+    if (!PII_DETECTION_ENABLED) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'PII detection is not enabled on this server' 
+      });
+    }
+
+    let scanned = 0;
+    let withPII = 0;
+    let errors = 0;
+    let skipped = 0;
+    const force = req.body.force === true;
+    
+    console.log('Starting bulk PII scan...');
+    
+    // Stream all documents
+    let offset = null;
+    let hasMore = true;
+    
+    while (hasMore) {
+      const scrollResult = await qdrantClient.scroll(COLLECTION_NAME, {
+        limit: 50,
+        with_payload: true,
+        with_vector: false,
+        offset: offset
+      });
+      
+      if (!scrollResult.points || scrollResult.points.length === 0) {
+        hasMore = false;
+        break;
+      }
+      
+      for (const point of scrollResult.points) {
+        // Skip if already scanned and not forced
+        if (point.payload.pii_scan_date && !force) {
+          const lastScan = new Date(point.payload.pii_scan_date);
+          const hoursSinceLastScan = (Date.now() - lastScan) / 1000 / 60 / 60;
+          
+          if (hoursSinceLastScan < 24) {
+            skipped++;
+            continue;
+          }
+        }
+        
+        try {
+          console.log(`Scanning: ${point.payload.filename}`);
+          const piiResult = await detectPII(point.payload.content);
+          
+          await qdrantClient.setPayload(COLLECTION_NAME, {
+            points: [point.id],
+            payload: {
+              pii_detected: piiResult.hasPII,
+              pii_types: piiResult.piiTypes || [],
+              pii_details: piiResult.piiDetails || [],
+              pii_risk_level: piiResult.riskLevel || 'low',
+              pii_scan_date: piiResult.scanTimestamp,
+              pii_detection_method: piiResult.detectionMethod
+            }
+          });
+          
+          scanned++;
+          if (piiResult.hasPII) {
+            withPII++;
+            console.log(`  ⚠️  Found PII: ${piiResult.piiTypes.join(', ')}`);
+          }
+          
+        } catch (err) {
+          console.error(`Error scanning ${point.id}:`, err.message);
+          errors++;
+        }
+      }
+      
+      offset = scrollResult.next_page_offset;
+      if (!offset) {
+        hasMore = false;
+      }
+    }
+    
+    const message = `Scanned ${scanned} documents, found PII in ${withPII}${skipped > 0 ? ` (skipped ${skipped} recently scanned)` : ''}`;
+    console.log(`✓ Bulk scan complete: ${message}`);
+    
+    res.json({
+      success: true,
+      message: message,
+      stats: { 
+        scanned, 
+        withPII, 
+        errors, 
+        skipped,
+        percentageWithPII: scanned > 0 ? ((withPII / scanned) * 100).toFixed(1) : 0
+      }
+    });
+    
+  } catch (error) {
+    console.error('Bulk scan error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
     });
   }
 });

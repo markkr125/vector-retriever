@@ -142,6 +142,120 @@
           </div>
         </div>
       </div>
+
+      <!-- PII Risk Level Button -->
+      <div class="facet-dropdown">
+        <button 
+          @click="toggleDropdown('piiRisk')"
+          class="facet-btn"
+          :class="{ active: openDropdown === 'piiRisk', selected: selectedPIIRisk }"
+        >
+          ⚠️ PII Severity
+          <span v-if="selectedPIIRisk" class="count-badge selected">1</span>
+        </button>
+        
+        <div v-if="openDropdown === 'piiRisk'" class="facet-popup" @click.stop>
+          <div class="popup-header">
+            <button 
+              v-if="selectedPIIRisk"
+              @click="clearPIIRiskFilter"
+              class="popup-clear-btn"
+              title="Clear severity filter"
+            >
+              ✕ Clear
+            </button>
+          </div>
+          <div class="popup-list">
+            <button
+              @click="selectPIIRisk('none')"
+              class="popup-item"
+              :class="{ selected: selectedPIIRisk === 'none' }"
+            >
+              <span class="item-name">✅ No PII</span>
+              <span class="item-count">{{ facets.piiRiskLevels.none || 0 }}</span>
+            </button>
+            <button
+              @click="selectPIIRisk('low')"
+              class="popup-item"
+              :class="{ selected: selectedPIIRisk === 'low' }"
+            >
+              <span class="item-name">🟢 Low Risk</span>
+              <span class="item-count">{{ facets.piiRiskLevels.low || 0 }}</span>
+            </button>
+            <button
+              @click="selectPIIRisk('medium')"
+              class="popup-item"
+              :class="{ selected: selectedPIIRisk === 'medium' }"
+            >
+              <span class="item-name">🟡 Medium Risk</span>
+              <span class="item-count">{{ facets.piiRiskLevels.medium || 0 }}</span>
+            </button>
+            <button
+              @click="selectPIIRisk('high')"
+              class="popup-item"
+              :class="{ selected: selectedPIIRisk === 'high' }"
+            >
+              <span class="item-name">🔴 High Risk</span>
+              <span class="item-count">{{ facets.piiRiskLevels.high || 0 }}</span>
+            </button>
+            <button
+              @click="selectPIIRisk('critical')"
+              class="popup-item"
+              :class="{ selected: selectedPIIRisk === 'critical' }"
+            >
+              <span class="item-name">⛔ Critical Risk</span>
+              <span class="item-count">{{ facets.piiRiskLevels.critical || 0 }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PII Type Button -->
+      <div class="facet-dropdown">
+        <button 
+          @click="toggleDropdown('piiTypes')"
+          class="facet-btn"
+          :class="{ active: openDropdown === 'piiTypes', selected: selectedPIITypes.length > 0 }"
+        >
+          🔒 PII Types
+          <span class="count-badge">{{ facets.piiTypes.length }}</span>
+        </button>
+        
+        <div v-if="openDropdown === 'piiTypes'" class="facet-popup" @click.stop>
+          <div class="popup-header">
+            <input 
+              v-model="piiTypeSearch"
+              type="text"
+              class="popup-search"
+              placeholder="Search PII types..."
+              @click.stop
+            />
+            <button 
+              v-if="selectedPIITypes.length > 0"
+              @click="clearPIITypesFilter"
+              class="popup-clear-btn"
+              title="Clear PII type filters"
+            >
+              ✕ Clear {{ selectedPIITypes.length > 1 ? 'All' : '' }}
+            </button>
+          </div>
+          <div class="popup-list">
+            <button
+              v-for="type in filteredPIITypes"
+              :key="type.name"
+              @click="selectPIIType(type.name)"
+              class="popup-item"
+              :class="{ selected: selectedPIITypes.includes(type.name) }"
+            >
+              <span class="item-name">{{ formatPIITypeName(type.name) }}</span>
+              <span class="item-count">{{ type.count }}</span>
+            </button>
+            <div v-if="filteredPIITypes.length === 0" class="no-results">
+              No PII types found
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
       
     <!-- Clear Filter Button -->
@@ -171,18 +285,21 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['filter-category', 'filter-location', 'filter-tag', 'clear-filter'])
+const emit = defineEmits(['filter-category', 'filter-location', 'filter-tag', 'filter-pii-risk', 'filter-pii-type', 'clear-filter'])
 
 const allFacets = ref({
   categories: [],
   locations: [],
-  tags: []
+  tags: [],
+  piiRiskLevels: {},
+  piiTypes: []
 })
 
 const openDropdown = ref(null)
 const categorySearch = ref('')
 const locationSearch = ref('')
 const tagSearch = ref('')
+const piiTypeSearch = ref('')
 
 // Get selected values from props
 const selectedCategory = computed(() => {
@@ -196,6 +313,13 @@ const selectedLocation = computed(() => {
 const selectedTags = computed(() => {
   return props.activeFilters.filter(f => f.type === 'tag').map(f => f.value)
 })
+const selectedPIIRisk = computed(() => {
+  const filter = props.activeFilters.find(f => f.type === 'pii_risk')
+  return filter ? filter.value : null
+})
+const selectedPIITypes = computed(() => {
+  return props.activeFilters.filter(f => f.type === 'pii_type').map(f => f.value)
+})
 
 // Compute facets from current results if available, otherwise show collection counts
 const facets = computed(() => {
@@ -204,6 +328,8 @@ const facets = computed(() => {
     const categoryCounts = {}
     const locationCounts = {}
     const tagCounts = {}
+    const riskLevelCounts = { none: 0, low: 0, medium: 0, high: 0, critical: 0 }
+    const piiTypeCounts = {}
     
     props.results.forEach(result => {
       // Count categories
@@ -222,6 +348,22 @@ const facets = computed(() => {
           tagCounts[tag] = (tagCounts[tag] || 0) + 1
         })
       }
+      
+      // Count PII risk levels
+      if (result.payload?.pii_detected) {
+        const riskLevel = result.payload.pii_risk_level || 'medium'
+        riskLevelCounts[riskLevel] = (riskLevelCounts[riskLevel] || 0) + 1
+        
+        // Count PII types
+        if (result.payload.pii_types && Array.isArray(result.payload.pii_types)) {
+          result.payload.pii_types.forEach(type => {
+            piiTypeCounts[type] = (piiTypeCounts[type] || 0) + 1
+          })
+        }
+      } else {
+        // No PII detected
+        riskLevelCounts.none++
+      }
     })
     
     return {
@@ -232,6 +374,10 @@ const facets = computed(() => {
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count),
       tags: Object.entries(tagCounts)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count),
+      piiRiskLevels: riskLevelCounts,
+      piiTypes: Object.entries(piiTypeCounts)
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count)
     }
@@ -265,6 +411,32 @@ const filteredTags = computed(() => {
   )
 })
 
+const filteredPIITypes = computed(() => {
+  if (!piiTypeSearch.value) return facets.value.piiTypes
+  const search = piiTypeSearch.value.toLowerCase()
+  return facets.value.piiTypes.filter(type => 
+    type.name.toLowerCase().includes(search)
+  )
+})
+
+const formatPIITypeName = (type) => {
+  const icons = {
+    'name': '👤',
+    'email': '📧',
+    'phone': '📞',
+    'address': '🏠',
+    'ssn': '🆔',
+    'credit_card': '💳',
+    'passport': '🛂',
+    'driver_license': '🚗',
+    'ip_address': '🌐',
+    'date_of_birth': '🎂'
+  }
+  const icon = icons[type] || '🔒'
+  const label = type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  return `${icon} ${label}`
+}
+
 const toggleDropdown = (dropdown) => {
   openDropdown.value = openDropdown.value === dropdown ? null : dropdown
   // Reset search when opening
@@ -272,6 +444,7 @@ const toggleDropdown = (dropdown) => {
     categorySearch.value = ''
     locationSearch.value = ''
     tagSearch.value = ''
+    piiTypeSearch.value = ''
   }
 }
 
@@ -288,6 +461,16 @@ const selectLocation = (location) => {
 const selectTag = (tag) => {
   emit('filter-tag', tag)
   openDropdown.value = null
+}
+
+const selectPIIRisk = (level) => {
+  emit('filter-pii-risk', level)
+  openDropdown.value = null
+}
+
+const selectPIIType = (type) => {
+  emit('filter-pii-type', type)
+  // Don't close dropdown to allow multi-select
 }
 
 const clearCategoryFilter = () => {
@@ -309,6 +492,19 @@ const clearTagsFilter = () => {
   })
 }
 
+const clearPIIRiskFilter = () => {
+  if (selectedPIIRisk.value) {
+    emit('filter-pii-risk', selectedPIIRisk.value) // Toggle off
+  }
+}
+
+const clearPIITypesFilter = () => {
+  // Clear all selected PII types one by one
+  selectedPIITypes.value.forEach(type => {
+    emit('filter-pii-type', type) // Toggle each off
+  })
+}
+
 const clearFilter = () => {
   emit('clear-filter')
 }
@@ -324,7 +520,14 @@ onMounted(async () => {
   // Load all facets from API
   try {
     const response = await api.get('/facets')
-    allFacets.value = response.data
+    const data = response.data
+    allFacets.value = {
+      categories: data.categories || [],
+      locations: data.locations || [],
+      tags: data.tags || [],
+      piiRiskLevels: data.piiStats?.riskLevels || { none: 0, low: 0, medium: 0, high: 0, critical: 0 },
+      piiTypes: data.piiTypes || []
+    }
   } catch (error) {
     console.error('Failed to load facets:', error)
   }

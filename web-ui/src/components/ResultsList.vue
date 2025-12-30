@@ -60,7 +60,39 @@
 
         <!-- Metadata -->
         <div class="result-metadata">
-          <h3 class="result-filename">{{ result.payload.filename }}</h3>
+          <!-- Filename row with PII indicators -->
+          <div class="filename-row">
+            <h3 class="result-filename">{{ result.payload.filename }}</h3>
+            
+            <!-- PII Status Section (aligned right) -->
+            <div class="pii-inline-section">
+              <!-- Show PII Warning if detected -->
+              <button 
+                v-if="result.payload.pii_detected"
+                @click.stop="showPIIDetails(result)"
+                class="pii-warning-badge-inline"
+                :class="`risk-${result.payload.pii_risk_level || 'medium'}`"
+                :title="`Click to see ${result.payload.pii_details?.length || 0} sensitive data points`"
+              >
+                <span class="pii-icon">⚠️</span>
+                <span class="pii-text">{{ formatPIITypes(result.payload.pii_types) }}</span>
+                <span class="pii-count">{{ result.payload.pii_details?.length || 0 }}</span>
+              </button>
+
+              <!-- Scan Button (visible for all documents) -->
+              <button 
+                @click.stop="scanDocumentPII(result.id, result.payload.pii_scan_date)"
+                class="btn-scan-pii-inline"
+                :class="{ 'already-scanned': result.payload.pii_scan_date }"
+                :disabled="scanning[result.id]"
+                :title="result.payload.pii_scan_date ? 'Re-scan for sensitive data' : 'Scan for sensitive data (GDPR/PII)'"
+              >
+                <span v-if="scanning[result.id]">🔄 Scanning...</span>
+                <span v-else-if="result.payload.pii_scan_date">🔄 Re-scan</span>
+                <span v-else>🔒 Scan PII</span>
+              </button>
+            </div>
+          </div>
           
           <div class="metadata-grid">
             <div v-if="result.payload.category" class="meta-item">
@@ -89,19 +121,9 @@
             </div>
           </div>
 
-          <!-- Tags -->
-          <div v-if="result.payload.tags && result.payload.tags.length > 0" class="tags">
-            <span 
-              v-for="tag in result.payload.tags" 
-              :key="tag"
-              class="tag"
-            >
-              {{ tag }}
-            </span>
-          </div>
-
-          <!-- Document Type Indicators -->
-          <div class="doc-type-badges">
+          <!-- Tags row -->
+          <div class="tags-row">
+            <!-- Document Type Badge -->
             <span 
               v-if="result.payload.is_unstructured" 
               class="badge badge-secondary"
@@ -115,6 +137,16 @@
               title="Document with rich metadata"
             >
               📊 Structured
+            </span>
+
+            <!-- Tags -->
+            <span 
+              v-for="tag in result.payload.tags" 
+              :key="tag"
+              class="tag"
+              v-if="result.payload.tags && result.payload.tags.length > 0"
+            >
+              {{ tag }}
             </span>
           </div>
         </div>
@@ -203,6 +235,7 @@
 <script setup>
 import { marked } from 'marked'
 import { computed, ref } from 'vue'
+import api from '../api'
 
 const props = defineProps({
   results: {
@@ -226,9 +259,10 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['page-change', 'find-similar', 'clear-similar'])
+const emit = defineEmits(['page-change', 'find-similar', 'clear-similar', 'show-pii-modal', 'refresh-results', 'scan-complete'])
 
 const expandedIds = ref(new Set())
+const scanning = ref({})
 
 // Count results excluding source document for display
 const displayResultsCount = computed(() => {
@@ -320,7 +354,66 @@ const toggleExpand = (id) => {
     expandedIds.value.add(id)
   }
 }
-</script>
+const formatPIITypes = (types) => {
+  if (!types || types.length === 0) return ''
+  const icons = {
+    credit_card: '💳',
+    email: '📧',
+    phone: '📱',
+    ssn: '🆔',
+    address: '🏠',
+    bank_account: '🏦',
+    name: '👤',
+    dob: '🎂',
+    medical: '🏥',
+    ip_address: '🌐'
+  }
+  return types.map(t => icons[t] || '🔒').join(' ')
+}
+
+const showPIIDetails = (result) => {
+  emit('show-pii-modal', {
+    id: result.id,
+    filename: result.payload.filename,
+    piiTypes: result.payload.pii_types,
+    piiDetails: result.payload.pii_details,
+    riskLevel: result.payload.pii_risk_level,
+    scanDate: result.payload.pii_scan_date
+  })
+}
+
+const scanDocumentPII = async (docId, alreadyScanned) => {
+  scanning.value[docId] = true
+  
+  try {
+    // Add force=true query param if document was already scanned
+    const url = alreadyScanned 
+      ? `/documents/${docId}/scan-pii?force=true`
+      : `/documents/${docId}/scan-pii`
+    
+    const response = await api.post(url)
+    
+    // Emit notification event instead of alert
+    emit('scan-complete', {
+      success: true,
+      piiDetected: response.data.piiDetected,
+      message: response.data.message,
+      piiTypes: response.data.piiTypes || [],
+      piiCount: response.data.piiDetails?.length || 0
+    })
+    
+    emit('refresh-results')
+    
+  } catch (error) {
+    console.error('Scan error:', error)
+    emit('scan-complete', {
+      success: false,
+      error: error.response?.data?.error || error.message
+    })
+  } finally {
+    scanning.value[docId] = false
+  }
+}</script>
 
 <style scoped>
 .results-list {
@@ -495,13 +588,22 @@ const toggleExpand = (id) => {
   margin-bottom: 1rem;
 }
 
+.filename-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
 .result-filename {
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 1rem;
+  margin: 0;
   word-break: break-word;
   overflow-wrap: break-word;
+  flex: 1;
 }
 
 .metadata-grid {
@@ -527,9 +629,11 @@ const toggleExpand = (id) => {
   color: var(--text-primary);
 }
 
-.tags {
+/* Tags Row */
+.tags-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
   margin-bottom: 1rem;
 }
@@ -543,10 +647,142 @@ const toggleExpand = (id) => {
   color: var(--text-secondary);
 }
 
+/* PII Inline Section */
+.pii-inline-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* Inline PII Warning Badge */
+.pii-warning-badge-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  background: linear-gradient(135deg, #ff9800, #ff5722);
+  border: 2px solid #ff5722;
+  border-radius: 6px;
+  color: white;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.pii-warning-badge-inline:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 87, 34, 0.3);
+}
+
+.pii-warning-badge-inline.risk-low {
+  background: linear-gradient(135deg, #4caf50, #45a049);
+  border-color: #4caf50;
+}
+
+.pii-warning-badge-inline.risk-medium {
+  background: linear-gradient(135deg, #ff9800, #fb8c00);
+  border-color: #ff9800;
+}
+
+.pii-warning-badge-inline.risk-high {
+  background: linear-gradient(135deg, #ff5722, #f4511e);
+  border-color: #ff5722;
+}
+
+.pii-warning-badge-inline.risk-critical {
+  background: linear-gradient(135deg, #d32f2f, #c62828);
+  border-color: #d32f2f;
+  animation: pulse 2s infinite;
+}
+
+.pii-warning-badge-inline .pii-icon {
+  font-size: 1rem;
+}
+
+.pii-warning-badge-inline .pii-text {
+  font-size: 0.85rem;
+}
+
+.pii-warning-badge-inline .pii-count {
+  background: rgba(255, 255, 255, 0.3);
+  padding: 0.15rem 0.4rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Inline Scan Button */
+.btn-scan-pii-inline {
+  padding: 0.5rem 0.9rem;
+  background: #ff5722;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.btn-scan-pii-inline:hover:not(:disabled) {
+  background: #f4511e;
+}
+
+.btn-scan-pii-inline.already-scanned {
+  background: #666;
+  color: white;
+}
+
+.btn-scan-pii-inline.already-scanned:hover:not(:disabled) {
+  background: #555;
+}
+
+.btn-scan-pii-inline:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
 .doc-type-badges {
   display: flex;
   gap: 0.5rem;
   margin-bottom: 1rem;
+}
+
+/* Scan PII Button Styles (legacy - keeping for compatibility) */
+.pii-scan-section {
+  margin: 1rem 0;
+}
+
+.btn-scan-pii {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-scan-pii:hover:not(:disabled) {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(66, 133, 244, 0.3);
+}
+
+.btn-scan-pii:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .result-content {

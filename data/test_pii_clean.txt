@@ -1,0 +1,21 @@
+Clean document with no PII data.
+
+This is a test document that contains only general information about technology.
+
+Quantum computing is an emerging field that uses quantum mechanics principles 
+to process information. Unlike classical computers that use bits (0 or 1), 
+quantum computers use quantum bits or qubits that can exist in multiple states 
+simultaneously through superposition.
+
+The potential applications of quantum computing include:
+- Cryptography and security
+- Drug discovery and molecular modeling  
+- Financial modeling and optimization
+- Weather forecasting and climate modeling
+- Artificial intelligence and machine learning
+
+Major tech companies and research institutions are investing heavily in 
+quantum computing research and development.
+
+Category: Technology
+Tags: quantum computing, science, innovation
