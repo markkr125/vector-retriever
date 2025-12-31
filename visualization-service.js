@@ -6,6 +6,7 @@
 
 const { UMAP } = require('umap-js');
 const { createClient } = require('redis');
+const crypto = require('crypto');
 
 /**
  * Base cache interface
@@ -387,6 +388,241 @@ class VisualizationService {
       console.error('[Viz] Generation error:', error);
       throw error;
     }
+  }
+
+  /**
+   * Get visualization for specific search results
+   */
+  async getSearchResultsVisualization(searchParams) {
+    const startTime = Date.now();
+    
+    // Generate cache key from search params
+    const cacheKey = `viz:search:${this.hashSearchParams(searchParams)}`;
+    
+    // Check cache
+    if (!searchParams.forceRefresh) {
+      const cached = await this.cache.get(cacheKey);
+      if (cached) {
+        const age = Date.now() - cached.metadata.generatedAt;
+        console.log(`[Viz] Search results cache hit (age: ${Math.round(age / 1000)}s)`);
+        return {
+          ...cached,
+          fromCache: true,
+          cacheAge: age
+        };
+      }
+    }
+
+    console.log('[Viz] Generating search results visualization...');
+
+    try {
+      const { query, searchType, denseWeight, filters, limit = 5000 } = searchParams;
+
+      // 1. Execute search to get matching documents
+      console.log(`[Viz] Executing search: "${query}" (${searchType})`);
+      const searchStartTime = Date.now();
+      
+      // Build search request based on type
+      let searchResults = [];
+      
+      if (searchType === 'semantic' || searchType === 'hybrid') {
+        // Need to get embedding for query
+        const embedding = searchParams.queryEmbedding; // Should be passed from caller
+        
+        if (!embedding) {
+          throw new Error('Query embedding required for semantic/hybrid search');
+        }
+
+        // Perform vector search with filters
+        searchResults = await this.qdrantClient.search(this.collectionName, {
+          vector: { name: 'dense', vector: embedding },
+          filter: filters,
+          limit: limit,
+          with_payload: true,
+          with_vector: true
+        });
+      } else if (searchType === 'keyword') {
+        // For keyword search, we'd need sparse vector search
+        // For now, fall back to scroll with filters
+        const scrollResult = await this.qdrantClient.scroll(this.collectionName, {
+          filter: filters,
+          limit: limit,
+          with_payload: true,
+          with_vector: true
+        });
+        searchResults = scrollResult.points;
+      } else {
+        // Default: just get filtered documents
+        const scrollResult = await this.qdrantClient.scroll(this.collectionName, {
+          filter: filters,
+          limit: limit,
+          with_payload: true,
+          with_vector: true
+        });
+        searchResults = scrollResult.points;
+      }
+
+      const searchDuration = Date.now() - searchStartTime;
+      console.log(`[Viz] Search complete: ${searchResults.length} results in ${searchDuration}ms`);
+
+      if (searchResults.length === 0) {
+        return {
+          points: [],
+          metadata: {
+            totalMatches: 0,
+            visualizedCount: 0,
+            generatedAt: Date.now(),
+            method: 'none',
+            searchQuery: query,
+            processingTime: {
+              search: searchDuration,
+              umap: 0
+            }
+          },
+          fromCache: false,
+          generationTime: Date.now() - startTime
+        };
+      }
+
+      // 2. Extract vectors for UMAP
+      const vectors = searchResults.map(p => {
+        if (p.vector && p.vector.dense) {
+          return p.vector.dense;
+        } else if (p.vector && Array.isArray(p.vector)) {
+          return p.vector;
+        } else if (p.vector) {
+          const vectorNames = Object.keys(p.vector);
+          if (vectorNames.includes('dense')) {
+            return p.vector.dense;
+          } else if (vectorNames.length > 0) {
+            return p.vector[vectorNames[0]];
+          }
+        }
+        throw new Error(`Invalid vector format for point ${p.id}`);
+      });
+
+      console.log(`[Viz] Running UMAP on ${vectors.length} vectors...`);
+      const umapStart = Date.now();
+
+      // 3. Run UMAP dimensionality reduction
+      const umap = new UMAP({
+        nComponents: 2,
+        nNeighbors: Math.min(15, Math.floor(vectors.length / 2)),
+        minDist: 0.1,
+        spread: 1.0
+      });
+
+      const embedding = await umap.fitAsync(vectors);
+      const umapDuration = Date.now() - umapStart;
+      console.log(`[Viz] UMAP complete in ${umapDuration}ms`);
+
+      // 4. Format response
+      const formattedPoints = searchResults.map((point, idx) => {
+        const [x, y] = embedding[idx];
+        
+        return {
+          id: point.id,
+          x: x,
+          y: y,
+          title: point.payload?.title || point.payload?.filename || `Document ${point.id}`,
+          category: point.payload?.category || 'Unknown',
+          location: point.payload?.location || null,
+          tags: point.payload?.tags || [],
+          piiRisk: point.payload?.pii_risk_level || 'none',
+          date: point.payload?.upload_date || null,
+          snippet: point.payload?.content?.substring(0, 150) || '',
+          score: point.score || null
+        };
+      });
+
+      const visualizationData = {
+        points: formattedPoints,
+        metadata: {
+          totalMatches: searchResults.length,
+          visualizedCount: formattedPoints.length,
+          generatedAt: Date.now(),
+          method: 'umap',
+          searchQuery: query,
+          searchType: searchType,
+          parameters: {
+            nNeighbors: Math.min(15, Math.floor(vectors.length / 2)),
+            minDist: 0.1
+          },
+          processingTime: {
+            search: searchDuration,
+            umap: umapDuration
+          }
+        }
+      };
+
+      // 5. Cache with shorter TTL (10 minutes)
+      await this.cache.set(cacheKey, visualizationData, 600000);
+
+      const totalDuration = Date.now() - startTime;
+      console.log(`[Viz] Search results visualization complete in ${totalDuration}ms`);
+
+      return {
+        ...visualizationData,
+        fromCache: false,
+        generationTime: totalDuration
+      };
+
+    } catch (error) {
+      console.error('[Viz] Search results visualization error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Hash search parameters for cache key
+   */
+  hashSearchParams(params) {
+    const { query, searchType, denseWeight, filters, limit } = params;
+    
+    // Normalize filters by sorting keys
+    const normalizedFilters = filters ? this.normalizeFilters(filters) : null;
+    
+    const normalized = JSON.stringify({
+      q: query?.toLowerCase().trim() || '',
+      type: searchType || 'semantic',
+      weight: denseWeight || 0.7,
+      filters: normalizedFilters,
+      limit: limit || 5000
+    });
+    
+    return crypto.createHash('md5').update(normalized).digest('hex');
+  }
+
+  /**
+   * Normalize filters for consistent hashing
+   */
+  normalizeFilters(filters) {
+    if (!filters) return null;
+    
+    // Sort filter keys and values for consistent hashing
+    const normalized = {};
+    
+    if (filters.must) {
+      normalized.must = filters.must.map(f => {
+        const sorted = {};
+        Object.keys(f).sort().forEach(key => {
+          sorted[key] = f[key];
+        });
+        return sorted;
+      }).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+    }
+    
+    if (filters.should) {
+      normalized.should = filters.should.map(f => {
+        const sorted = {};
+        Object.keys(f).sort().forEach(key => {
+          sorted[key] = f[key];
+        });
+        return sorted;
+      }).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+    }
+    
+    return normalized;
   }
 
   /**

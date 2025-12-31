@@ -7,9 +7,20 @@
         <span>Searching...</span>
       </div>
       <div v-else-if="query" class="results-info">
-        <h2 class="results-title">
-          Search Results
-        </h2>
+        <div class="results-title-row">
+          <h2 class="results-title">
+            Search Results
+          </h2>
+          <!-- Cluster Visualization Button -->
+          <button 
+            v-if="totalResults > 0 && searchType !== 'random' && !showClusterView"
+            @click="toggleClusterView" 
+            class="btn-visualize-results"
+            :disabled="clusterLoading"
+          >
+            🗺️ Visualize Results ({{ totalResults }})
+          </button>
+        </div>
         <div class="results-meta">
           <span class="badge badge-primary">{{ searchTypeLabel }}</span>
           <span class="results-count">{{ displayResultsCount }} results out of {{ totalResults }}</span>
@@ -39,13 +50,127 @@
       </div>
     </div>
 
+    <!-- Cluster Visualization Panel -->
+    <div v-if="query && totalResults > 0 && searchType !== 'random' && showClusterView" class="cluster-visualization-section">
+      <!-- Cluster View Panel -->
+      <div class="cluster-view-panel card">
+        <div class="cluster-header">
+          <div class="cluster-info">
+            <h3>📊 Search Results Visualization</h3>
+            <div v-if="clusterData" class="cluster-meta">
+              <span class="cluster-count">
+                <strong>{{ clusterData.metadata?.visualizedCount || 0 }}</strong> 
+                {{ clusterData.metadata?.visualizedCount >= clusterData.metadata?.totalMatches ? 'results' : `of ${clusterData.metadata?.totalMatches} results` }}
+              </span>
+              <span v-if="clusterData.fromCache" class="cluster-cache">
+                ✅ Cached ({{ formatCacheAge(clusterData.cacheAge) }} ago)
+              </span>
+              <span v-else class="cluster-fresh">
+                🆕 Generated in {{ clusterData.generationTime }}ms
+              </span>
+            </div>
+          </div>
+          <div class="cluster-controls">
+            <div class="control-group">
+              <label>Color by:</label>
+              <select v-model="clusterColorBy" class="control-select">
+                <option value="category">Category</option>
+                <option value="piiRisk">PII Risk</option>
+                <option value="date">Upload Date</option>
+              </select>
+            </div>
+            <button 
+              v-if="clusterSelectedPoints.length > 0"
+              @click="clearClusterSelection" 
+              class="btn btn-small btn-clear-selection"
+              title="Clear selection filter"
+            >
+              ✕ Clear Selection
+            </button>
+            <button @click="refreshClusterView" class="btn btn-small" :disabled="clusterLoading">
+              🔄 Refresh
+            </button>
+            <button @click="hideClusterView" class="btn btn-small btn-close">
+              ❌ Hide
+            </button>
+          </div>
+        </div>
+
+        <!-- Loading State -->
+        <div v-if="clusterLoading" class="cluster-loading">
+          <div class="spinner"></div>
+          <p>Generating visualization...</p>
+        </div>
+
+        <!-- Error State -->
+        <div v-else-if="clusterError" class="cluster-error">
+          <p>❌ {{ clusterError }}</p>
+          <button @click="loadClusterVisualization" class="btn btn-small">Retry</button>
+        </div>
+
+        <!-- Empty/Stale State -->
+        <div v-else-if="!clusterData && showClusterView" class="cluster-empty">
+          <p>📊 Click refresh to generate visualization with current filters</p>
+          <button @click="loadClusterVisualization" class="btn btn-primary">Generate Visualization</button>
+        </div>
+
+        <!-- Scatter Plot -->
+        <div v-else-if="clusterData" class="cluster-plot-container">
+          <ScatterPlot
+            ref="scatterPlotRef"
+            :points="clusterData.points"
+            :colorBy="clusterColorBy"
+            :selectedPoints="clusterSelectedPoints"
+            :height="500"
+            @point-click="handleClusterPointClick"
+            @selection-change="handleClusterSelection"
+          />
+
+          <!-- Selection Filter Info -->
+          <div v-if="clusterSelectedPoints.length > 0" class="cluster-filter-info">
+            <span>📌 Showing {{ clusterSelectedPoints.length }} selected document{{ clusterSelectedPoints.length > 1 ? 's' : '' }} from visualization</span>
+            <button @click="clearClusterSelection" class="btn-clear-filter">✕ Clear Filter</button>
+          </div>
+
+          <!-- Hidden Selection Panel (kept for reference, not displayed) -->
+          <div v-if="false && clusterSelectedPoints.length > 0" class="cluster-selection-panel">
+            <div class="selection-header">
+              <h4>Selected Documents ({{ clusterSelectedPoints.length }})</h4>
+              <button @click="clearClusterSelection" class="btn btn-small">Clear</button>
+            </div>
+            <div class="selected-list">
+              <div
+                v-for="point in clusterSelectedPoints.slice(0, 10)"
+                :key="point.id"
+                class="selected-item"
+                @click="scrollToResult(point.id)"
+              >
+                <div class="selected-title">{{ point.title }}</div>
+                <div class="selected-meta">
+                  <span class="badge" :style="{ backgroundColor: getCategoryColor(point.category) }">
+                    {{ point.category }}
+                  </span>
+                  <span v-if="point.location" class="badge badge-location">{{ point.location }}</span>
+                </div>
+              </div>
+              <div v-if="clusterSelectedPoints.length > 10" class="selected-more">
+                + {{ clusterSelectedPoints.length - 10 }} more
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Results -->
     <transition-group name="slide-up" tag="div" class="results-grid">
       <div 
-        v-for="(result, index) in results" 
+        v-for="(result, index) in props.results" 
         :key="result.id"
+        :id="`result-${result.id}`"
+        :data-doc-id="result.id"
         class="result-card card"
-        :class="{ 'source-document': result.isSource }"
+        :class="{ 'source-document': result.isSource, 'highlight': highlightedDocId === result.id }"
       >
         <!-- Source Document Badge -->
         <div v-if="result.isSource" class="source-badge">
@@ -242,9 +367,11 @@
 
 <script setup>
 import { marked } from 'marked'
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import api from '../api'
+import ScatterPlot from './ScatterPlot.vue'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const props = defineProps({
   results: {
     type: Array,
@@ -264,18 +391,52 @@ const props = defineProps({
   limit: {
     type: Number,
     default: 10
+  },
+  filters: {
+    type: Object,
+    default: () => ({})
+  },
+  denseWeight: {
+    type: Number,
+    default: 0.7
   }
 })
 
-const emit = defineEmits(['page-change', 'find-similar', 'clear-similar', 'clear-random', 'show-pii-modal', 'refresh-results', 'scan-complete'])
+const emit = defineEmits(['page-change', 'find-similar', 'clear-similar', 'clear-random', 'show-pii-modal', 'refresh-results', 'scan-complete', 'filter-by-ids'])
 
 const expandedIds = ref(new Set())
 const scanning = ref({})
 
+// Cluster visualization state
+const scatterPlotRef = ref(null)
+const showClusterView = ref(false)
+const clusterData = ref(null)
+const clusterLoading = ref(false)
+const clusterError = ref(null)
+const clusterColorBy = ref('category')
+const clusterSelectedPoints = ref([])
+const highlightedDocId = ref(null)
+
+const categoryColors = {
+  'Restaurant': '#FF6B6B',
+  'Hotel': '#4ECDC4',
+  'Technology': '#45B7D1',
+  'Shopping': '#FFA07A',
+  'Attraction': '#98D8C8',
+  'Cafe': '#FFD93D',
+  'Coworking': '#6C5CE7',
+  'Gym': '#A8E6CF',
+  'Hospital': '#FF8B94',
+  'Museum': '#C7CEEA',
+  'University': '#FFEAA7',
+  'Unknown': '#95A5A6'
+}
+
 // Count results excluding source document for display
 const displayResultsCount = computed(() => {
-  const hasSourceDoc = props.results.some(r => r.isSource)
-  return hasSourceDoc ? props.results.length - 1 : props.results.length
+  const resultsToCount = props.results
+  const hasSourceDoc = resultsToCount.some(r => r.isSource)
+  return hasSourceDoc ? resultsToCount.length - 1 : resultsToCount.length
 })
 
 const totalPages = computed(() => {
@@ -421,7 +582,154 @@ const scanDocumentPII = async (docId, alreadyScanned) => {
   } finally {
     scanning.value[docId] = false
   }
-}</script>
+}
+
+// Cluster visualization methods
+const toggleClusterView = async () => {
+  if (showClusterView.value) {
+    showClusterView.value = false
+  } else {
+    showClusterView.value = true
+    if (!clusterData.value) {
+      await loadClusterVisualization()
+    }
+  }
+}
+
+const loadClusterVisualization = async (forceRefresh = false) => {
+  clusterLoading.value = true
+  clusterError.value = null
+  
+  try {
+    const payload = {
+      query: props.query,
+      searchType: props.searchType,
+      denseWeight: props.denseWeight,
+      filters: props.filters,
+      limit: 5000,
+      forceRefresh
+    }
+    
+    const response = await fetch(`${API_URL}/api/visualize/search-results`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+    
+    const result = await response.json()
+    clusterData.value = result.data  // Extract the data property from the response
+  } catch (error) {
+    console.error('Cluster visualization error:', error)
+    clusterError.value = error.message || 'Failed to load cluster visualization'
+  } finally {
+    clusterLoading.value = false
+  }
+}
+
+const refreshClusterView = async () => {
+  await loadClusterVisualization(true)
+}
+
+const hideClusterView = () => {
+  showClusterView.value = false
+}
+
+const handleClusterPointClick = (point) => {
+  const docId = point.customdata?.id
+  if (!docId) return
+  
+  // Check if the document is in current results
+  const docIndex = props.results.findIndex(r => r.id === docId)
+  
+  if (docIndex !== -1) {
+    scrollToResult(docId)
+  } else {
+    // Document not on current page - could navigate or show message
+    console.log('Document not on current page:', docId)
+  }
+}
+
+const handleClusterSelection = (points) => {
+  console.log('Selection received:', points)
+  if (!points || points.length === 0) {
+    clusterSelectedPoints.value = []
+    // Clear the ID filter - refresh to show all results
+    emit('filter-by-ids', [])
+    return
+  }
+  clusterSelectedPoints.value = points.map(p => ({
+    id: p.id,
+    title: p.title || 'Untitled',
+    category: p.category
+  })).filter(p => p.id)
+  console.log('Processed selection:', clusterSelectedPoints.value)
+  
+  // Emit event to trigger search with only selected IDs
+  const selectedIds = clusterSelectedPoints.value.map(p => p.id)
+  emit('filter-by-ids', selectedIds)
+}
+
+const scrollToResult = (docId) => {
+  highlightedDocId.value = docId
+  
+  // Wait for next tick to ensure DOM is updated
+  nextTick(() => {
+    const element = document.getElementById(`result-${docId}`)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      
+      // Remove highlight after animation
+      setTimeout(() => {
+        highlightedDocId.value = null
+      }, 2000)
+    }
+  })
+}
+
+const clearClusterSelection = () => {
+  clusterSelectedPoints.value = []
+  // Clear the visual selection in the plot
+  if (scatterPlotRef.value) {
+    scatterPlotRef.value.clearSelection()
+  }
+}
+
+const formatCacheAge = (ms) => {
+  if (ms < 1000) return `${Math.round(ms)}ms ago`
+  const seconds = Math.floor(ms / 1000)
+  if (seconds < 60) return `${seconds}s ago`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  return `${hours}h ago`
+}
+
+const getCategoryColor = (category) => {
+  return categoryColors[category] || '#64748b'
+}
+
+// Watch for filter changes and invalidate visualization
+// Only marks visualization as stale, doesn't auto-refresh to avoid loops
+watch(
+  () => JSON.stringify({
+    query: props.query,
+    searchType: props.searchType,
+    filters: props.filters,
+    denseWeight: props.denseWeight
+  }),
+  (newVal, oldVal) => {
+    if (oldVal && newVal !== oldVal && showClusterView.value && clusterData.value) {
+      // Clear cluster data to force user to manually refresh
+      // This prevents stale visualizations from being shown
+      clusterData.value = null
+      clusterSelectedPoints.value = []
+    }
+  }
+)</script>
 
 <style scoped>
 .results-list {
@@ -432,6 +740,295 @@ const scanDocumentPII = async (docId, alreadyScanned) => {
 
 .results-header {
   padding: 2rem;
+}
+
+/* Cluster Visualization Section */
+.cluster-visualization-section {
+  margin: 0.75rem 0;
+}
+
+.btn-visualize-results {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.btn-visualize-results:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.cluster-view-panel {
+  margin-top: -1rem;
+  margin-bottom: -1rem;
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.5rem;
+  background: var(--bg-secondary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.cluster-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.cluster-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.cluster-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.cluster-controls label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-right: 0.25rem;
+}
+
+.cluster-controls select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: white;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.cluster-controls button {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.cluster-controls button:hover {
+  background: var(--bg-secondary);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.btn-clear-selection {
+  background: #fef3c7 !important;
+  border-color: #f59e0b !important;
+  color: #92400e !important;
+}
+
+.btn-clear-selection:hover {
+  background: #fde68a !important;
+  border-color: #d97706 !important;
+  color: #78350f !important;
+}
+
+.cluster-plot-container {
+  margin-top: 1rem;
+  height: 500px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cluster-loading,
+.cluster-error,
+.cluster-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  font-size: 1rem;
+  color: var(--text-secondary);
+}
+
+.cluster-error {
+  color: #dc2626;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cluster-empty {
+  flex-direction: column;
+  gap: 1rem;
+  background: #f0f9ff;
+  border: 2px dashed #3b82f6;
+  border-radius: 8px;
+  padding: 2rem;
+}
+
+.cluster-empty p {
+  margin: 0;
+  font-size: 1rem;
+  color: #1e40af;
+}
+
+.cluster-filter-info {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: #dbeafe;
+  border: 2px solid #3b82f6;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e40af;
+}
+
+.btn-clear-filter {
+  padding: 0.35rem 0.75rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-clear-filter:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
+}
+
+.cluster-info {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.cluster-selection-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #eff6ff;
+  border: 1px solid #3b82f6;
+  border-radius: 8px;
+}
+
+.cluster-selection-panel h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cluster-selection-panel button {
+  padding: 0.25rem 0.5rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.cluster-selection-panel button:hover {
+  background: #2563eb;
+}
+
+.selected-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.selected-item {
+  padding: 0.5rem;
+  background: white;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.selected-item {
+  padding: 0.75rem;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.selected-item:hover {
+  background: #dbeafe;
+  transform: translateX(4px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.selected-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.selected-meta {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.selected-more {
+  padding: 0.5rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.result-card.highlight {
+  animation: highlightPulse 0.6s ease-in-out;
+}
+
+@keyframes highlightPulse {
+  0%, 100% {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    box-shadow: 0 4px 30px rgba(59, 130, 246, 0.6);
+    transform: scale(1.01);
+  }
 }
 
 .loading-state {
@@ -449,10 +1046,19 @@ const scanDocumentPII = async (docId, alreadyScanned) => {
   gap: 1rem;
 }
 
+.results-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
 .results-title {
   font-size: 1.75rem;
   font-weight: 700;
   color: var(--text-primary);
+  margin: 0;
 }
 
 .clear-similar-btn {

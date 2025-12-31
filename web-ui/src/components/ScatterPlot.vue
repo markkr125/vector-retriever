@@ -215,6 +215,33 @@ onMounted(() => {
     window.removeEventListener('resize', handleResize);
   };
 });
+
+// Expose method to clear selection
+const clearSelection = () => {
+  if (plotContainer.value) {
+    // Clear any selection shapes from the layout
+    Plotly.relayout(plotContainer.value, {
+      'selections': []
+    });
+    
+    // Clear selectedpoints for all traces
+    if (plotContainer.value.data) {
+      const numTraces = plotContainer.value.data.length;
+      const update = {};
+      for (let i = 0; i < numTraces; i++) {
+        update[`selectedpoints[${i}]`] = null;
+      }
+      Plotly.restyle(plotContainer.value, update);
+    }
+    
+    // Trigger deselect event
+    plotContainer.value.emit('plotly_deselect');
+  }
+};
+
+defineExpose({
+  clearSelection
+});
 </script>
 
 <style scoped>

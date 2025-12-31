@@ -87,6 +87,8 @@
                 :currentPage="searchFormRef?.currentPage || 1"
                 :totalResults="totalResults"
                 :limit="searchFormRef?.limit || 10"
+                :filters="lastSearchParams?.filters || {}"
+                :denseWeight="lastSearchParams?.denseWeight || 0.7"
                 @page-change="handlePageChange"
                 @find-similar="handleFindSimilar"
                 @clear-similar="handleClearSimilar"
@@ -94,6 +96,7 @@
                 @show-pii-modal="handleShowPIIModal"
                 @refresh-results="performSearch"
                 @scan-complete="handleScanComplete"
+                @filter-by-ids="handleFilterByIds"
               />
             </div>
           </div>
@@ -320,6 +323,12 @@ onMounted(async () => {
   
   // Restore filters from URL
   const filtersParam = url.searchParams.get('filters')
+  const queryParam = url.searchParams.get('q')
+  const typeParam = url.searchParams.get('type')
+  const weightParam = url.searchParams.get('weight')
+  const limitParam = url.searchParams.get('limit')
+  const pageParam = url.searchParams.get('page')
+  
   if (filtersParam) {
     try {
       const parsedFilters = JSON.parse(filtersParam)
@@ -361,17 +370,37 @@ onMounted(async () => {
           ]
         }
         
-        // Execute the filtered search
-        currentQuery.value = activeFilters.value.map(f => `${f.type}: ${f.value}`).join(', ')
-        searchType.value = 'facet'
-        const searchParams = {
-          searchType: 'semantic',
-          query: '',
-          limit: 10,
-          page: 1,
-          filters
+        // Execute the search with filters
+        // If there's a query, use it; otherwise it's a filter-only search
+        if (queryParam && queryParam.trim()) {
+          // Search with query and filters
+          const filterText = activeFilters.value.length > 0 ? ` (${activeFilters.value.map(f => f.value).join(', ')})` : ''
+          currentQuery.value = `${queryParam}${filterText}`
+          searchType.value = typeParam || 'hybrid'
+          
+          const searchParams = {
+            searchType: typeParam || 'hybrid',
+            query: queryParam,
+            limit: parseInt(limitParam) || 10,
+            page: parseInt(pageParam) || 1,
+            denseWeight: parseFloat(weightParam) || 0.7,
+            filters
+          }
+          await handleSearch(searchParams)
+        } else {
+          // Filter-only search
+          currentQuery.value = activeFilters.value.map(f => `${f.value}`).join(', ')
+          searchType.value = 'facet'
+          
+          const searchParams = {
+            searchType: 'semantic',
+            query: '',
+            limit: parseInt(limitParam) || 10,
+            page: parseInt(pageParam) || 1,
+            filters
+          }
+          await handleSearch(searchParams)
         }
-        await handleSearch(searchParams)
       }
     } catch (error) {
       console.error('Failed to parse filters from URL:', error)
@@ -416,7 +445,8 @@ const handleSearch = async (searchParams) => {
           query: searchParams.query,
           limit: searchParams.limit,
           offset: offset,
-          filters: searchParams.filters
+          filters: searchParams.filters,
+          documentIds: searchParams.documentIds
         })
         break
       
@@ -426,7 +456,8 @@ const handleSearch = async (searchParams) => {
           limit: searchParams.limit,
           offset: offset,
           denseWeight: searchParams.denseWeight,
-          filters: searchParams.filters
+          filters: searchParams.filters,
+          documentIds: searchParams.documentIds
         })
         break
       
@@ -562,7 +593,19 @@ const handlePageChange = async (page) => {
     return
   }
   
-  if (searchFormRef.value) {
+  // If we have documentIds filter active, preserve it during pagination
+  if (lastSearchParams.value && lastSearchParams.value.documentIds) {
+    // Update the page in SearchForm to keep UI in sync
+    if (searchFormRef.value) {
+      searchFormRef.value.currentPage = page
+    }
+    
+    const searchParams = {
+      ...lastSearchParams.value,
+      page: page
+    }
+    await handleSearch(searchParams)
+  } else if (searchFormRef.value) {
     searchFormRef.value.goToPage(page)
   }
 }
@@ -1113,6 +1156,28 @@ const closePIIModal = () => {
 const handleScanComplete = (data) => {
   scanNotificationData.value = data
   showScanNotification.value = true
+}
+
+// Handle filter by document IDs from cluster selection
+const handleFilterByIds = async (docIds) => {
+  if (!docIds || docIds.length === 0) {
+    // Clear ID filter and re-run the original search
+    if (lastSearchParams.value && lastSearchParams.value.query) {
+      const searchParams = { ...lastSearchParams.value }
+      delete searchParams.documentIds
+      await handleSearch(searchParams)
+    }
+    return
+  }
+  
+  // Execute search with ID filter
+  if (lastSearchParams.value && lastSearchParams.value.query) {
+    const searchParams = {
+      ...lastSearchParams.value,
+      documentIds: docIds
+    }
+    await handleSearch(searchParams)
+  }
 }
 
 // Perform search again to refresh results (e.g., after PII scan)

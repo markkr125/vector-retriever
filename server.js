@@ -794,11 +794,14 @@ app.get('/api/collection/:name/info', async (req, res) => {
  */
 app.post('/api/search/semantic', async (req, res) => {
   try {
-    const { query, limit = 10, offset = 0, filters } = req.body;
+    const { query, limit = 10, offset = 0, filters, documentIds } = req.body;
     
     // Debug: Log filters
     if (filters) {
       console.log('Semantic search filters:', JSON.stringify(filters, null, 2));
+    }
+    if (documentIds) {
+      console.log('Semantic search documentIds:', documentIds);
     }
     
     let results;
@@ -812,10 +815,23 @@ app.post('/api/search/semantic', async (req, res) => {
         with_payload: true
       };
       
-      if (filters) {
+      // Build filter with documentIds if provided
+      let effectiveFilters = filters;
+      if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
+        if (!effectiveFilters) {
+          effectiveFilters = { must: [] };
+        } else if (!effectiveFilters.must) {
+          effectiveFilters = { ...effectiveFilters, must: [] };
+        } else {
+          effectiveFilters = { ...effectiveFilters, must: [...effectiveFilters.must] };
+        }
+        effectiveFilters.must.push({ has_id: documentIds });
+      }
+      
+      if (effectiveFilters) {
         // Special handling for never_scanned filter - need to do client-side filtering
-        const hasNeverScannedFilter = filters.must_not && 
-          filters.must_not.some(f => f.key === 'pii_detected');
+        const hasNeverScannedFilter = effectiveFilters.must_not && 
+          effectiveFilters.must_not.some(f => f.key === 'pii_detected');
         
         if (hasNeverScannedFilter) {
           // Can't filter for missing fields in Qdrant, so fetch all and filter
@@ -828,7 +844,7 @@ app.post('/api/search/semantic', async (req, res) => {
               limit: 100,
               offset: scrollOffset,
               with_payload: true,
-              filter: filters.must ? { must: filters.must } : undefined // Apply other filters
+              filter: effectiveFilters.must ? { must: effectiveFilters.must } : undefined // Apply other filters
             });
             
             scrollResult.points.forEach(p => {
@@ -853,14 +869,14 @@ app.post('/api/search/semantic', async (req, res) => {
           
           totalEstimate = allResults.length;
         } else {
-          scrollParams.filter = filters;
+          scrollParams.filter = effectiveFilters;
           const scrollResults = await qdrantClient.scroll(COLLECTION_NAME, scrollParams);
           results = scrollResults.points.map(p => ({
             id: p.id,
             score: 1.0,
             payload: p.payload
           }));
-          totalEstimate = await countFilteredDocuments(filters);
+          totalEstimate = await countFilteredDocuments(effectiveFilters);
         }
       } else {
         const scrollResults = await qdrantClient.scroll(COLLECTION_NAME, scrollParams);
@@ -885,16 +901,29 @@ app.post('/api/search/semantic', async (req, res) => {
         with_payload: true
       };
       
-      if (filters) {
-        const hasNeverScannedFilter = filters.must_not && 
-          filters.must_not.some(f => f.key === 'pii_detected');
+      // Build filter with documentIds if provided
+      let effectiveFilters = filters;
+      if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
+        if (!effectiveFilters) {
+          effectiveFilters = { must: [] };
+        } else if (!effectiveFilters.must) {
+          effectiveFilters = { ...effectiveFilters, must: [] };
+        } else {
+          effectiveFilters = { ...effectiveFilters, must: [...effectiveFilters.must] };
+        }
+        effectiveFilters.must.push({ has_id: documentIds });
+      }
+      
+      if (effectiveFilters) {
+        const hasNeverScannedFilter = effectiveFilters.must_not && 
+          effectiveFilters.must_not.some(f => f.key === 'pii_detected');
         
         if (hasNeverScannedFilter) {
           // For never_scanned with vector search, get more results then filter
           const largeSearchParams = {
             ...searchParams,
             limit: 1000,
-            filter: filters.must ? { must: filters.must } : undefined
+            filter: effectiveFilters.must ? { must: effectiveFilters.must } : undefined
           };
           
           const allResults = await qdrantClient.search(COLLECTION_NAME, largeSearchParams);
@@ -910,15 +939,27 @@ app.post('/api/search/semantic', async (req, res) => {
           
           totalEstimate = filteredResults.length;
         } else {
-          searchParams.filter = filters;
+          searchParams.filter = effectiveFilters;
           const searchResults = await qdrantClient.search(COLLECTION_NAME, searchParams);
           results = searchResults.map(r => ({
             id: r.id,
             score: r.score,
             payload: r.payload
           }));
-          totalEstimate = await countFilteredDocuments(filters);
+          totalEstimate = await countFilteredDocuments(effectiveFilters);
         }
+      } else if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
+        // No filters but documentIds provided
+        searchParams.filter = {
+          must: [{ has_id: documentIds }]
+        };
+        const searchResults = await qdrantClient.search(COLLECTION_NAME, searchParams);
+        results = searchResults.map(r => ({
+          id: r.id,
+          score: r.score,
+          payload: r.payload
+        }));
+        totalEstimate = documentIds.length; // Rough estimate
       } else {
         const searchResults = await qdrantClient.search(COLLECTION_NAME, searchParams);
         results = searchResults.map(r => ({
@@ -926,7 +967,7 @@ app.post('/api/search/semantic', async (req, res) => {
           score: r.score,
           payload: r.payload
         }));
-        totalEstimate = await countFilteredDocuments(filters);
+        totalEstimate = await countFilteredDocuments(null);
       }
     }
     
@@ -948,11 +989,14 @@ app.post('/api/search/semantic', async (req, res) => {
  */
 app.post('/api/search/hybrid', async (req, res) => {
   try {
-    const { query, limit = 10, offset = 0, denseWeight = 0.7, filters } = req.body;
+    const { query, limit = 10, offset = 0, denseWeight = 0.7, filters, documentIds } = req.body;
     
     // Debug: Log filters
     if (filters) {
       console.log('Hybrid search filters:', JSON.stringify(filters, null, 2));
+    }
+    if (documentIds) {
+      console.log('Hybrid search documentIds:', documentIds);
     }
     
     if (!query) {
@@ -1027,10 +1071,33 @@ app.post('/api/search/hybrid', async (req, res) => {
           });
         }
         
+        // Add document IDs filter if provided
+        if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
+          qdrantFilter.must.push({
+            has_id: documentIds
+          });
+        }
+        
         if (qdrantFilter.must.length > 0) {
           searchParams.filter = qdrantFilter;
         }
       }
+      
+      // If filters already in Qdrant format - add documentIds if provided
+      if (filters && filters.must && Array.isArray(filters.must)) {
+        if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
+          searchParams.filter.must.push({
+            has_id: documentIds
+          });
+        }
+      }
+    } else if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
+      // No filters but documentIds provided
+      searchParams.filter = {
+        must: [{
+          has_id: documentIds
+        }]
+      };
     }
     
     // Special handling for never_scanned filter with vector search
@@ -1484,14 +1551,8 @@ app.get('/api/facets', async (req, res) => {
     // Add "never_scanned" count
     riskLevels.never_scanned = totalNeverScanned;
     
-    // Debug logging
-    console.log('PII Stats:', {
-      totalPoints,
-      totalWithPII,
-      totalNeverScanned,
-      noneCount: riskLevels.none,
-      riskLevels
-    });
+    // Debug logging (commented out to reduce noise)
+    // console.log('PII Stats:', { totalPoints, totalWithPII, totalNeverScanned, noneCount: riskLevels.none, riskLevels });
     
     res.json({
       categories,
@@ -2001,6 +2062,43 @@ app.get('/api/visualize/scatter', async (req, res) => {
     });
   } catch (error) {
     console.error('Visualization error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/visualize/search-results
+ * Get visualization for specific search results
+ */
+app.post('/api/visualize/search-results', async (req, res) => {
+  try {
+    const { query, searchType, denseWeight, filters, limit, forceRefresh } = req.body;
+
+    // Get query embedding if needed for semantic/hybrid search
+    let queryEmbedding = null;
+    if (query && (searchType === 'semantic' || searchType === 'hybrid')) {
+      queryEmbedding = await getDenseEmbedding(query);
+    }
+
+    const data = await visualizationService.getSearchResultsVisualization({
+      query,
+      searchType,
+      denseWeight,
+      filters,
+      limit: limit || 5000,
+      forceRefresh: forceRefresh || false,
+      queryEmbedding
+    });
+
+    res.json({
+      success: true,
+      data
+    });
+  } catch (error) {
+    console.error('Search results visualization error:', error);
     res.status(500).json({
       success: false,
       error: error.message
