@@ -427,6 +427,69 @@ See `server.js` lines 906-940 for implementation pattern.
 - `GET /api/health` - Qdrant + Ollama connectivity check
 - `GET /api/config` - Frontend config (PII enabled, models, etc.)
 
+## Vue.js UI Architecture
+
+**Component Hierarchy:**
+```
+App.vue (root - 1772 lines)
+├── SearchForm.vue (822 lines)
+│   ├── Search type selector (hybrid/semantic/by-document/location/geo)
+│   ├── Dense weight slider (for hybrid)
+│   ├── Advanced filters (category, price, rating, tags)
+│   └── Emits: search, clear, surpriseMe
+├── ResultsList.vue (1993 lines)
+│   ├── Result cards with metadata + PII badges
+│   ├── Pagination controls with smart ellipsis
+│   ├── Browse/sort controls (for browse mode)
+│   ├── Cluster visualization (inline ScatterPlot)
+│   ├── Bookmark management (localStorage)
+│   └── Emits: page-change, find-similar, filter-by-ids, sort-change
+├── FacetsSidebar.vue (364 lines)
+│   ├── Categories, locations, tags (collapsible)
+│   ├── PII filters (types, risk levels)
+│   ├── Bulk PII scan button
+│   └── Emits: filter-category, filter-tag, filter-pii-type, filter-pii-risk
+├── UploadModal.vue (798 lines)
+│   ├── File upload (multiple files)
+│   ├── Text input (with metadata)
+│   ├── Auto-categorization toggle
+│   └── Returns jobId → opens UploadProgressModal
+├── UploadProgressModal.vue
+│   ├── Animated progress bar (diagonal stripes + shimmer)
+│   ├── File-by-file status (⏳ processing, ✅ success, ❌ error)
+│   ├── Polls every 1 second
+│   └── Stop button with confirmation
+├── PIIDetailsModal.vue
+│   ├── Shows PII findings with masked values
+│   ├── Risk level indicator
+│   └── Detection method + timestamp
+├── ScatterPlot.vue (341 lines)
+│   ├── Plotly.js 2D visualization
+│   ├── Box/lasso selection enabled
+│   └── Color coding by category/PII risk/date
+└── ScanNotification.vue
+    └── Toast notification for PII scan completion
+```
+
+**State Management:** No Vuex/Pinia - uses props/events pattern
+```javascript
+// App.vue → ResultsList.vue
+<ResultsList @find-similar="handleFindSimilar" @filter-by-ids="handleFilterByIds" />
+
+// ResultsList.vue → App.vue
+this.$emit('find-similar', documentId);
+```
+
+**Key Component Responsibilities:**
+- **App.vue**: Orchestrates all state, handles API calls, manages URL state, view switching (search/browse/bookmarks)
+- **SearchForm.vue**: Search configuration, builds search params, validates input, 5 search types
+- **ResultsList.vue**: Displays results, manages bookmarks (localStorage), inline visualization, pagination UI
+- **FacetsSidebar.vue**: Browse-by filtering, loads facet counts from `/api/facets`, PII filters
+- **UploadModal.vue**: Multi-file upload or text input, optional metadata fields, auto-categorization
+- **UploadProgressModal.vue**: Real-time progress with job polling (1s interval), stop capability, file-by-file status
+
+**Facet filtering flow:** `FacetsSidebar.vue` emits filter → `App.vue` rebuilds Qdrant filter object → calls API → re-renders results.
+
 ## Integration Points
 
 ### Ollama Embedding API
