@@ -426,7 +426,7 @@ class VisualizationService {
     console.log('[Viz] Generating search results visualization...');
 
     try {
-      const { query, searchType, denseWeight, filters, limit = 5000 } = searchParams;
+      const { query, searchType, denseWeight, filters, limit = 5000, bookmarkIds } = searchParams;
 
       // 1. Execute search to get matching documents
       console.log(`[Viz] Executing search: "${query}" (${searchType})`);
@@ -435,7 +435,19 @@ class VisualizationService {
       // Build search request based on type
       let searchResults = [];
       
-      if (searchType === 'semantic' || searchType === 'hybrid') {
+      if (searchType === 'bookmarks' && bookmarkIds && bookmarkIds.length > 0) {
+        // For bookmarks, retrieve specific documents by IDs
+        const ids = bookmarkIds.map(id => {
+          const num = parseInt(id, 10);
+          return isNaN(num) ? id : num;
+        });
+        
+        searchResults = await this.qdrantClient.retrieve(this.collectionName, {
+          ids: ids,
+          with_payload: true,
+          with_vector: true
+        });
+      } else if (searchType === 'semantic' || searchType === 'hybrid') {
         // Need to get embedding for query
         const embedding = searchParams.queryEmbedding; // Should be passed from caller
         

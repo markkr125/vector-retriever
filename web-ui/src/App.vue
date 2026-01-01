@@ -18,6 +18,9 @@
               <button @click="switchView('browse')" class="btn btn-secondary btn-compact" :class="{ 'active': currentView === 'browse' }">
                 📚 Browse
               </button>
+              <button @click="switchView('bookmarks')" class="btn btn-secondary btn-compact" :class="{ 'active': currentView === 'bookmarks' }">
+                ⭐ Bookmarks
+              </button>
               <button @click="handleSurpriseMe" class="btn btn-secondary btn-compact" :disabled="loading">
                 🎲 Surprise
               </button>
@@ -80,6 +83,28 @@
             @show-pii-modal="handleShowPIIModal"
             @refresh-results="loadBrowseResults"
             @scan-complete="handleScanComplete"
+          />
+        </div>
+
+        <!-- Bookmarks View -->
+        <div v-else-if="currentView === 'bookmarks'" class="bookmarks-view">
+          <ResultsList
+            :results="bookmarkedResults"
+            :loading="bookmarksLoading"
+            query=""
+            searchType="bookmarks"
+            :currentPage="bookmarksPage"
+            :totalResults="bookmarksTotal"
+            :limit="bookmarksLimit"
+            :filters="{}"
+            :denseWeight="0"
+            @find-similar="handleFindSimilar"
+            @show-pii-modal="handleShowPIIModal"
+            @refresh-results="loadBookmarkedDocuments"
+            @scan-complete="handleScanComplete"
+            @filter-by-ids="handleFilterByIds"
+            @page-change="handleBookmarksPageChange"
+            @limit-change="handleBookmarksLimitChange"
           />
         </div>
 
@@ -211,6 +236,10 @@ const switchView = (view) => {
     // Load browse data when switching to browse view
     browsePage.value = 1 // Reset to first page
     loadBrowseResults()
+  } else if (view === 'bookmarks') {
+    path = '/bookmarks'
+    // Load bookmarked documents
+    loadBookmarkedDocuments()
   }
   const url = new URL(window.location)
   // Preserve query parameters (filters, similarTo, etc.)
@@ -226,6 +255,10 @@ const restoreViewFromURL = async () => {
     currentView.value = 'browse'
     // Load browse results
     await loadBrowseResults()
+  } else if (pathname === '/bookmarks') {
+    currentView.value = 'bookmarks'
+    // Load bookmarked documents
+    await loadBookmarkedDocuments()
   } else if (pathname === '/search' || pathname === '/') {
     currentView.value = 'search'
     // Redirect root to /search for consistency
@@ -435,6 +468,14 @@ const browseLimit = ref(20)
 const browseTotal = ref(0)
 const browseSortBy = ref('id')
 const browseSortOrder = ref('asc')
+
+// Bookmarks state
+const bookmarkedResults = ref([])
+const fullBookmarkedResults = ref([]) // Store full list before filtering
+const bookmarksLoading = ref(false)
+const bookmarksPage = ref(1)
+const bookmarksLimit = ref(20)
+const bookmarksTotal = ref(0)
 
 // Computed property for upload state
 const hasActiveUpload = computed(() => !!activeJobId.value)
@@ -876,6 +917,62 @@ const loadBrowseResults = async () => {
   } finally {
     browseLoading.value = false
   }
+}
+
+// Load bookmarked documents
+const loadBookmarkedDocuments = async () => {
+  bookmarksLoading.value = true
+  
+  try {
+    // Get bookmarked IDs from localStorage
+    const stored = localStorage.getItem('bookmarkedDocuments')
+    const bookmarkedIds = stored ? JSON.parse(stored) : []
+    
+    if (bookmarkedIds.length === 0) {
+      bookmarkedResults.value = []
+      bookmarksLoading.value = false
+      return
+    }
+    
+    // Fetch documents by IDs
+    const response = await api.get('/bookmarks', {
+      params: {
+        ids: bookmarkedIds.join(',')
+      }
+    })
+    
+    const allResults = response.data.results || []
+    fullBookmarkedResults.value = allResults // Store full list
+    bookmarksTotal.value = allResults.length
+    
+    // Apply client-side pagination
+    const startIndex = (bookmarksPage.value - 1) * bookmarksLimit.value
+    const endIndex = startIndex + bookmarksLimit.value
+    bookmarkedResults.value = allResults.slice(startIndex, endIndex)
+    
+    console.log(`Loaded ${bookmarkedResults.value.length} of ${bookmarksTotal.value} bookmarked documents (page ${bookmarksPage.value})`)
+  } catch (error) {
+    console.error('Bookmarks error:', error)
+    alert('Failed to load bookmarks: ' + (error.response?.data?.error || error.message))
+  } finally {
+    bookmarksLoading.value = false
+  }
+}
+
+// Handle bookmarks page change
+const handleBookmarksPageChange = (page) => {
+  bookmarksPage.value = page
+  loadBookmarkedDocuments()
+  
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+// Handle bookmarks limit change
+const handleBookmarksLimitChange = (newLimit) => {
+  bookmarksLimit.value = newLimit
+  bookmarksPage.value = 1 // Reset to first page
+  loadBookmarkedDocuments()
 }
 
 // Handle browse page change
@@ -1370,8 +1467,12 @@ const handleScanComplete = (data) => {
 // Handle filter by document IDs from cluster selection
 const handleFilterByIds = async (docIds) => {
   if (!docIds || docIds.length === 0) {
-    // Clear ID filter and re-run the original search
-    if (lastSearchParams.value && lastSearchParams.value.query) {
+    // Clear ID filter
+    if (currentView.value === 'bookmarks') {
+      // Restore all bookmarks
+      await loadBookmarkedDocuments()
+    } else if (lastSearchParams.value && lastSearchParams.value.query) {
+      // Re-run the original search
       const searchParams = { ...lastSearchParams.value }
       delete searchParams.documentIds
       await handleSearch(searchParams)
@@ -1379,8 +1480,12 @@ const handleFilterByIds = async (docIds) => {
     return
   }
   
-  // Execute search with ID filter
-  if (lastSearchParams.value && lastSearchParams.value.query) {
+  // Filter by IDs
+  if (currentView.value === 'bookmarks') {
+    // Filter bookmarks to only show selected IDs
+    bookmarkedResults.value = fullBookmarkedResults.value.filter(r => docIds.includes(r.id))
+  } else if (lastSearchParams.value && lastSearchParams.value.query) {
+    // Execute search with ID filter
     const searchParams = {
       ...lastSearchParams.value,
       documentIds: docIds

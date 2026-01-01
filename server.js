@@ -1392,6 +1392,46 @@ app.get('/api/browse', async (req, res) => {
 });
 
 /**
+ * GET /api/bookmarks
+ * Fetch documents by IDs (for bookmarks)
+ * Query params: ids (comma-separated list of document IDs)
+ */
+app.get('/api/bookmarks', async (req, res) => {
+  try {
+    const idsParam = req.query.ids || '';
+    const ids = idsParam.split(',')
+      .map(id => id.trim())
+      .filter(id => id)
+      .map(id => {
+        // Convert to integer if it's a numeric ID, otherwise keep as string (UUID)
+        const num = parseInt(id, 10);
+        return isNaN(num) ? id : num;
+      });
+    
+    if (ids.length === 0) {
+      return res.json({ results: [] });
+    }
+    
+    // Use retrieve API to fetch specific points by IDs
+    const points = await qdrantClient.retrieve(COLLECTION_NAME, {
+      ids: ids,
+      with_payload: true,
+      with_vector: false
+    });
+    
+    const results = points.map(point => ({
+      id: point.id,
+      payload: point.payload
+    }));
+    
+    res.json({ results });
+  } catch (error) {
+    console.error('Bookmarks error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/stats
  * Get collection statistics
  */
@@ -2394,7 +2434,7 @@ app.get('/api/visualize/scatter', async (req, res) => {
  */
 app.post('/api/visualize/search-results', async (req, res) => {
   try {
-    const { query, searchType, denseWeight, filters, limit, forceRefresh } = req.body;
+    const { query, searchType, denseWeight, filters, limit, forceRefresh, bookmarkIds } = req.body;
 
     // Get query embedding if needed for semantic/hybrid search
     let queryEmbedding = null;
@@ -2409,7 +2449,8 @@ app.post('/api/visualize/search-results', async (req, res) => {
       filters,
       limit: limit || 5000,
       forceRefresh: forceRefresh || false,
-      queryEmbedding
+      queryEmbedding,
+      bookmarkIds
     });
 
     res.json({

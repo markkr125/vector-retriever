@@ -6,10 +6,10 @@
         <span class="loading"></span>
         <span>Searching...</span>
       </div>
-      <div v-else-if="query || searchType === 'browse'" class="results-info">
+      <div v-else-if="query || searchType === 'browse' || searchType === 'bookmarks'" class="results-info">
         <div class="results-title-row">
           <h2 class="results-title">
-            {{ searchType === 'browse' ? '📚 Browse All Documents' : 'Search Results' }}
+            {{ searchType === 'bookmarks' ? '⭐ My Bookmarks' : (searchType === 'browse' ? '📚 Browse All Documents' : 'Search Results') }}
           </h2>
           <!-- Browse Controls (for browse mode) -->
           <div v-if="searchType === 'browse'" class="browse-controls-inline">
@@ -39,6 +39,18 @@
               </select>
             </label>
           </div>
+          <!-- Bookmarks Controls (for bookmarks mode) -->
+          <div v-if="searchType === 'bookmarks'" class="browse-controls-inline">
+            <label class="control-label">
+              Per page:
+              <select v-model="bookmarksPerPage" @change="emit('limit-change', bookmarksPerPage)" class="control-select">
+                <option :value="10">10</option>
+                <option :value="20">20</option>
+                <option :value="50">50</option>
+                <option :value="100">100</option>
+              </select>
+            </label>
+          </div>
           <!-- Cluster Visualization Button -->
           <button 
             v-if="totalResults > 0 && searchType !== 'random' && searchType !== 'browse' && !showClusterView"
@@ -52,7 +64,7 @@
         <div class="results-meta">
           <span class="badge badge-primary">{{ searchTypeLabel }}</span>
           <span class="results-count">{{ displayResultsCount }} results out of {{ totalResults }}</span>
-          <span v-if="searchType !== 'browse'" class="query-text">"{{ query }}"</span>
+          <span v-if="searchType !== 'browse' && searchType !== 'bookmarks'" class="query-text">"{{ query }}"</span>
           <button 
             v-if="searchType === 'recommendation'"
             @click="emit('clear-similar')"
@@ -71,6 +83,11 @@
           </button>
         </div>
       </div>
+      <div v-else-if="searchType === 'bookmarks' && totalResults === 0" class="empty-state">
+        <span class="empty-icon">⭐</span>
+        <h3>No bookmarks yet</h3>
+        <p>Click the ⭐ star icon on any result to bookmark it!</p>
+      </div>
       <div v-else class="empty-state">
         <span class="empty-icon">🔍</span>
         <h3>Ready to search</h3>
@@ -79,7 +96,7 @@
     </div>
 
     <!-- Cluster Visualization Panel -->
-    <div v-if="query && totalResults > 0 && searchType !== 'random' && showClusterView" class="cluster-visualization-section">
+    <div v-if="(query || searchType === 'bookmarks' || searchType === 'browse') && totalResults > 0 && searchType !== 'random' && showClusterView" class="cluster-visualization-section">
       <!-- Cluster View Panel -->
       <div class="cluster-view-panel card">
         <div class="cluster-header">
@@ -319,9 +336,18 @@
 
         <!-- Action Buttons -->
         <div class="result-actions">
-          <!-- Link version for browse mode (allows open in new tab) -->
+          <!-- Bookmark Button -->
+          <button
+            @click="toggleBookmark(result.id)"
+            class="btn btn-bookmark"
+            :class="{ 'bookmarked': isBookmarked(result.id) }"
+            :title="isBookmarked(result.id) ? 'Remove bookmark' : 'Bookmark this document'"
+          >
+            {{ isBookmarked(result.id) ? '⭐' : '☆' }}
+          </button>
+          <!-- Link version for browse/bookmarks mode (allows open in new tab) -->
           <a 
-            v-if="searchType === 'browse'"
+            v-if="searchType === 'browse' || searchType === 'bookmarks'"
             :href="`/search?similarTo=${result.id}`"
             @click.prevent="$emit('find-similar', result.id)"
             class="btn btn-secondary btn-link"
@@ -455,10 +481,62 @@ const emit = defineEmits(['page-change', 'find-similar', 'clear-similar', 'clear
 const expandedIds = ref(new Set())
 const scanning = ref({})
 
+// Bookmarks state (localStorage)
+const bookmarkedIds = ref(new Set())
+
+// Load bookmarks from localStorage on mount
+const loadBookmarks = () => {
+  try {
+    const stored = localStorage.getItem('bookmarkedDocuments')
+    if (stored) {
+      bookmarkedIds.value = new Set(JSON.parse(stored))
+    }
+  } catch (error) {
+    console.error('Failed to load bookmarks:', error)
+  }
+}
+
+// Save bookmarks to localStorage
+const saveBookmarks = () => {
+  try {
+    localStorage.setItem('bookmarkedDocuments', JSON.stringify(Array.from(bookmarkedIds.value)))
+  } catch (error) {
+    console.error('Failed to save bookmarks:', error)
+  }
+}
+
+// Check if document is bookmarked
+const isBookmarked = (docId) => {
+  return bookmarkedIds.value.has(docId)
+}
+
+// Toggle bookmark
+const toggleBookmark = (docId) => {
+  if (bookmarkedIds.value.has(docId)) {
+    bookmarkedIds.value.delete(docId)
+  } else {
+    bookmarkedIds.value.add(docId)
+  }
+  saveBookmarks()
+  
+  // If we're in bookmarks view and removing a bookmark, refresh the list
+  if (props.searchType === 'bookmarks' && !bookmarkedIds.value.has(docId)) {
+    emit('refresh-results')
+  }
+}
+
+// Load bookmarks on mount
+onMounted(() => {
+  loadBookmarks()
+})
+
 // Browse controls (synced with props)
 const browseSortBy = ref(props.browseSortBy)
 const browseSortOrder = ref(props.browseSortOrder)
 const browsePerPage = ref(props.limit)
+
+// Bookmarks controls
+const bookmarksPerPage = ref(props.limit)
 
 // Cluster visualization state
 const scatterPlotRef = ref(null)
@@ -545,7 +623,8 @@ const searchTypeLabel = computed(() => {
     recommendation: '✨ Similar Documents',
     random: '🎲 Random Discovery',
     facet: '📂 Browse by Filter',
-    browse: '📚 Browse All'
+    browse: '📚 Browse All',
+    bookmarks: '⭐ My Bookmarks'
   }
   return labels[props.searchType] || 'Search'
 })
@@ -662,6 +741,11 @@ const loadClusterVisualization = async (forceRefresh = false) => {
       filters: props.filters,
       limit: 5000,
       forceRefresh
+    }
+    
+    // For bookmarks, include the specific document IDs
+    if (props.searchType === 'bookmarks') {
+      payload.bookmarkIds = props.results.map(r => r.id)
     }
     
     const response = await fetch(`${API_URL}/api/visualize/search-results`, {
@@ -1643,6 +1727,28 @@ onMounted(() => {
 
 .result-actions .btn {
   flex: 1;
+}
+
+.btn-bookmark {
+  font-size: 1.5rem;
+  padding: 0.3rem 0.6rem;
+  background: white;
+  border: 2px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: 0 0 auto !important;
+}
+
+.btn-bookmark:hover {
+  border-color: #fbbf24;
+  background: #fef3c7;
+  transform: scale(1.1);
+}
+
+.btn-bookmark.bookmarked {
+  background: #fef3c7;
+  border-color: #fbbf24;
+  color: #f59e0b;
 }
 
 .btn-link {
