@@ -13,6 +13,7 @@ This is a **comprehensive showcase** of Qdrant's advanced features:
 7. ✅ **Location-based Search** - City name filtering
 8. ✅ **PII Detection** - Multi-method GDPR compliance scanning with dual-agent validation
 9. ✅ **Background Processing** - Async uploads with progress tracking and crash resistance
+10. ✅ **Query by Example** - Upload documents to find similar content with temp file URL persistence
 
 ## 📚 Dataset: 27 Documents
 
@@ -40,6 +41,9 @@ npm run search "query"           # Semantic search
 npm run hybrid "query"           # Hybrid (semantic + keyword)
 node index.js location "Paris" "hotels"   # Location filter
 node index.js geo 48.8566 2.3522 50000 "museums"  # Geo-radius
+
+# Web UI (includes Query by Example)
+npm run webui                    # Start web interface on http://localhost:5000
 
 # Demos
 npm run demo                     # Full feature demo
@@ -80,6 +84,21 @@ Perfect for:
 - User-generated content
 - Research papers
 - Notes and summaries
+
+### Query by Example Simplifies Discovery
+Upload a document to find similar content without writing queries:
+- **Automatic extraction**: Supports TXT, MD, PDF, DOCX formats
+- **Semantic matching**: Finds conceptually similar documents
+- **URL persistence**: Temp file storage (1-hour TTL) enables bookmarking
+- **Background processing**: Non-blocking uploads with auto-cleanup
+- **Fallback parsing**: Multiple PDF extraction methods ensure reliability
+
+Perfect for:
+- Finding related documents in large collections
+- Content recommendation systems
+- Duplicate detection and deduplication
+- Research paper discovery
+- Similar case/ticket lookup
 
 ## 🏗️ Architecture
 

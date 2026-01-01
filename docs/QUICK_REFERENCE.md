@@ -56,7 +56,33 @@ filter: {
 }
 ```
 
-### 4. **Payload Indexes**
+### 4. **Query by Example (Web UI)**
+Upload a document (TXT, MD, PDF, DOCX) to find similar content.
+
+**Features:**
+- Automatic text extraction from uploaded files
+- PDF parsing with multiple fallback methods
+- Generate embeddings from document content
+- Find semantically similar documents in the collection
+- Temp file storage with 1-hour TTL for URL bookmarking
+- URL persistence: Share/bookmark uploaded document searches
+
+**Usage:**
+1. Start web UI: `npm run webui`
+2. Select "By Document" search type
+3. Upload a document file
+4. Results show documents similar to uploaded content
+5. URL includes tempFileId - bookmark or share the search
+6. Refresh works: temp file persists for 1 hour
+
+**API Endpoint:**
+```bash
+curl -X POST http://localhost:5000/api/search/by-document \
+  -F "file=@document.pdf" \
+  -F "limit=10"
+```
+
+### 5. **Payload Indexes**
 Fast filtering without full scans on:
 - category, location, tags, status (keyword indexes)
 - price, rating (float indexes)
@@ -130,6 +156,7 @@ node index.js geo 48.8566 2.3522 50000 "museums"
 6. **Dense vectors** understand semantic meaning and synonyms
 7. **Mixed datasets** allow structured + unstructured documents to coexist
 8. **Semantic search works equally well** on both document types
+9. **Query by Example** enables document-based similarity search with URL persistence
 
 ## 🚀 Performance Notes
 
