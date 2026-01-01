@@ -12,17 +12,11 @@
               <button @click="switchView('search')" class="btn btn-secondary btn-compact" :class="{ 'active': currentView === 'search' }">
                 🔍 Search
               </button>
-              <button @click="switchView('clusters')" class="btn btn-secondary btn-compact" :class="{ 'active': currentView === 'clusters' }">
-                📊 Clusters
-              </button>
               <button @click="switchView('browse')" class="btn btn-secondary btn-compact" :class="{ 'active': currentView === 'browse' }">
                 📚 Browse
               </button>
               <button @click="switchView('bookmarks')" class="btn btn-secondary btn-compact" :class="{ 'active': currentView === 'bookmarks' }">
                 ⭐ Bookmarks
-              </button>
-              <button @click="handleSurpriseMe" class="btn btn-secondary btn-compact" :disabled="loading">
-                🎲 Surprise
               </button>
             </div>
             <div class="add-document-section">
@@ -56,14 +50,8 @@
 
     <main class="main">
       <div class="container">
-        <!-- Cluster Visualization View -->
-        <DocumentClusterView 
-          v-if="currentView === 'clusters'" 
-          @view-document="handleViewDocumentFromCluster"
-        />
-
         <!-- Browse All View -->
-        <div v-else-if="currentView === 'browse'" class="browse-view">
+        <div v-if="currentView === 'browse'" class="browse-view">
           <ResultsList
             :results="browseResults"
             :loading="browseLoading"
@@ -83,6 +71,7 @@
             @show-pii-modal="handleShowPIIModal"
             @refresh-results="loadBrowseResults"
             @scan-complete="handleScanComplete"
+            @filter-by-ids="handleFilterByIds"
           />
         </div>
 
@@ -131,6 +120,7 @@
                 ref="searchFormRef"
                 @search="handleSearch"
                 @clear="handleClear"
+                @surprise-me="handleSurpriseMe"
                 :loading="loading"
                 :stats="stats"
               />
@@ -214,7 +204,6 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import api, { getActiveUploadJob, stopUploadJob } from './api'
-import DocumentClusterView from './components/DocumentClusterView.vue'
 import FacetBar from './components/FacetBar.vue'
 import PIIDetailsModal from './components/PIIDetailsModal.vue'
 import ResultsList from './components/ResultsList.vue'
@@ -229,9 +218,7 @@ const currentView = ref('search') // 'search', 'clusters', or 'browse'
 const switchView = (view) => {
   currentView.value = view
   let path = '/search'
-  if (view === 'clusters') {
-    path = '/clusters'
-  } else if (view === 'browse') {
+  if (view === 'browse') {
     path = '/browse'
     // Load browse data when switching to browse view
     browsePage.value = 1 // Reset to first page
@@ -249,9 +236,7 @@ const switchView = (view) => {
 // Restore view from URL path
 const restoreViewFromURL = async () => {
   const pathname = window.location.pathname
-  if (pathname === '/clusters') {
-    currentView.value = 'clusters'
-  } else if (pathname === '/browse') {
+  if (pathname === '/browse') {
     currentView.value = 'browse'
     // Load browse results
     await loadBrowseResults()
@@ -462,12 +447,15 @@ const activeFilters = ref([]) // Array of { type, value }
 
 // Browse mode state
 const browseResults = ref([])
+const fullBrowseResults = ref([]) // Store full list before filtering
 const browseLoading = ref(false)
 const browsePage = ref(1)
 const browseLimit = ref(20)
 const browseTotal = ref(0)
 const browseSortBy = ref('id')
 const browseSortOrder = ref('asc')
+const browseFilteredByCluster = ref(false)
+const browseSessionId = ref(null) // Session ID for server-side cache
 
 // Bookmarks state
 const bookmarkedResults = ref([])
@@ -895,23 +883,38 @@ const handleSurpriseMe = async () => {
 
 // Load browse results
 const loadBrowseResults = async () => {
+  // If filtered by cluster selection, don't reload from server
+  if (browseFilteredByCluster.value) {
+    return
+  }
+  
   browseLoading.value = true
   
   try {
-    const response = await api.get('/browse', {
-      params: {
-        limit: browseLimit.value,
-        page: browsePage.value,
-        sortBy: browseSortBy.value,
-        sortOrder: browseSortOrder.value
-      }
-    })
+    const params = {
+      limit: browseLimit.value,
+      page: browsePage.value,
+      sortBy: browseSortBy.value,
+      sortOrder: browseSortOrder.value
+    }
+    
+    // Include session ID if we have one
+    if (browseSessionId.value) {
+      params.sessionId = browseSessionId.value
+    }
+    
+    const response = await api.get('/browse', { params })
+    
+    // Store the session ID from response
+    if (response.data.sessionId) {
+      browseSessionId.value = response.data.sessionId
+    }
     
     browseResults.value = response.data.results || []
+    fullBrowseResults.value = response.data.results || []
     browseTotal.value = response.data.total || 0
     
-    console.log(`Loaded ${browseResults.value.length} browse results (page ${browsePage.value})`)
-  } catch (error) {
+    console.log(`Loaded ${browseResults.value.length} browse results (page ${browsePage.value}, session: ${browseSessionId.value})`)  } catch (error) {
     console.error('Browse error:', error)
     alert('Failed to browse documents: ' + (error.response?.data?.error || error.message))
   } finally {
@@ -989,6 +992,7 @@ const handleBrowseSortChange = ({ sortBy, sortOrder }) => {
   browseSortBy.value = sortBy
   browseSortOrder.value = sortOrder
   browsePage.value = 1 // Reset to first page
+  browseSessionId.value = null // Clear session to trigger fresh cache
   loadBrowseResults()
 }
 
@@ -996,16 +1000,8 @@ const handleBrowseSortChange = ({ sortBy, sortOrder }) => {
 const handleBrowseLimitChange = (newLimit) => {
   browseLimit.value = newLimit
   browsePage.value = 1 // Reset to first page
+  browseSessionId.value = null // Clear session to trigger fresh cache
   loadBrowseResults()
-}
-
-// Handle view document from cluster visualization
-const handleViewDocumentFromCluster = async (documentId) => {
-  // Switch to search view
-  switchView('search')
-  
-  // Trigger find similar for the selected document
-  await handleFindSimilar(documentId)
 }
 
 // Restore random results from URL using seed
@@ -1471,6 +1467,10 @@ const handleFilterByIds = async (docIds) => {
     if (currentView.value === 'bookmarks') {
       // Restore all bookmarks
       await loadBookmarkedDocuments()
+    } else if (currentView.value === 'browse') {
+      // Restore all browse results
+      browseFilteredByCluster.value = false
+      browseResults.value = fullBrowseResults.value
     } else if (lastSearchParams.value && lastSearchParams.value.query) {
       // Re-run the original search
       const searchParams = { ...lastSearchParams.value }
@@ -1484,6 +1484,10 @@ const handleFilterByIds = async (docIds) => {
   if (currentView.value === 'bookmarks') {
     // Filter bookmarks to only show selected IDs
     bookmarkedResults.value = fullBookmarkedResults.value.filter(r => docIds.includes(r.id))
+  } else if (currentView.value === 'browse') {
+    // Filter browse results to only show selected IDs
+    browseFilteredByCluster.value = true
+    browseResults.value = fullBrowseResults.value.filter(r => docIds.includes(r.id))
   } else if (lastSearchParams.value && lastSearchParams.value.query) {
     // Execute search with ID filter
     const searchParams = {
@@ -1665,6 +1669,14 @@ const handleClearFilter = async () => {
   background: #2980b9;
   font-weight: 600;
   box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+}
+
+.btn-secondary.active:hover {
+  background: #3498db;
+}
+
+.btn-secondary:hover {
+  background: rgba(41, 128, 185, 0.6);
 }
 
 @keyframes pulse {

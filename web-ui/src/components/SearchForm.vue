@@ -228,6 +228,19 @@
       </button>
     </div>
 
+    <!-- Surprise Me Button -->
+    <div class="button-row">
+      <button 
+        @click="handleSurpriseMe"
+        :disabled="loading"
+        class="btn btn-surprise"
+        title="Get random documents to discover new content"
+      >
+        <span v-if="loading" class="loading"></span>
+        <span v-else>🎲 Surprise Me</span>
+      </button>
+    </div>
+
     <p class="hint">Press Ctrl+Enter to search</p>
   </div>
 </template>
@@ -241,7 +254,7 @@ const props = defineProps({
   stats: Object
 })
 
-const emit = defineEmits(['search', 'clear'])
+const emit = defineEmits(['search', 'clear', 'surpriseMe'])
 
 // Form state
 const searchType = ref('hybrid')
@@ -447,6 +460,10 @@ const handleClear = () => {
   window.history.pushState({}, '', window.location.pathname)
   
   emit('clear')
+}
+
+const handleSurpriseMe = () => {
+  emit('surpriseMe')
 }
 
 // Watch search type to clear file when switching away from by-document
@@ -780,5 +797,25 @@ watch(searchType, () => {
 .upload-hint {
   color: var(--text-muted);
   font-size: 0.8rem;
+}
+
+.btn-surprise {
+  width: 100%;
+  background: var(--bg-secondary);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-surprise:hover:not(:disabled) {
+  background: var(--bg-color);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.btn-surprise:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

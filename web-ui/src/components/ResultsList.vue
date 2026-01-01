@@ -53,7 +53,7 @@
           </div>
           <!-- Cluster Visualization Button -->
           <button 
-            v-if="totalResults > 0 && searchType !== 'random' && searchType !== 'browse' && !showClusterView"
+            v-if="totalResults > 0 && searchType !== 'random' && !showClusterView"
             @click="toggleClusterView" 
             class="btn-visualize-results"
             :disabled="clusterLoading"
@@ -122,6 +122,15 @@
                 <option value="category">Category</option>
                 <option value="piiRisk">PII Risk</option>
                 <option value="date">Upload Date</option>
+              </select>
+            </div>
+            <div class="control-group">
+              <label>Max docs:</label>
+              <select v-model="clusterMaxDocs" @change="refreshClusterView" class="control-select">
+                <option :value="100">100</option>
+                <option :value="500">500</option>
+                <option :value="1000">1000</option>
+                <option :value="5000">5000</option>
               </select>
             </div>
             <button 
@@ -545,6 +554,7 @@ const clusterData = ref(null)
 const clusterLoading = ref(false)
 const clusterError = ref(null)
 const clusterColorBy = ref('category')
+const clusterMaxDocs = ref(1000)
 const clusterSelectedPoints = ref([])
 const highlightedDocId = ref(null)
 
@@ -739,7 +749,7 @@ const loadClusterVisualization = async (forceRefresh = false) => {
       searchType: props.searchType,
       denseWeight: props.denseWeight,
       filters: props.filters,
-      limit: 5000,
+      limit: clusterMaxDocs.value,
       forceRefresh
     }
     

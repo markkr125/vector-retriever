@@ -43,6 +43,22 @@ async function getPdfjs() {
 const app = express();
 const PORT = process.env.SERVER_PORT || 3001;
 
+// Browse session cache for pagination
+// Stores sorted document IDs to avoid re-fetching on each page
+const browseCache = new Map();
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+// Cleanup expired cache entries every 2 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of browseCache.entries()) {
+    if (now - value.timestamp > CACHE_TTL) {
+      browseCache.delete(key);
+      console.log(`Cleaned up expired browse cache: ${key}`);
+    }
+  }
+}, 2 * 60 * 1000);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -1323,7 +1339,8 @@ app.post('/api/search/geo', async (req, res) => {
 
 /**
  * GET /api/browse
- * Browse all documents with pagination and optional sorting
+ * Browse all documents with server-side session cache pagination
+ * Uses session cache to store sorted document IDs, fetches only requested page
  */
 app.get('/api/browse', async (req, res) => {
   try {
@@ -1331,56 +1348,127 @@ app.get('/api/browse', async (req, res) => {
     const page = parseInt(req.query.page || '1');
     const sortBy = req.query.sortBy || 'id'; // id, filename, date, category
     const sortOrder = req.query.sortOrder || 'asc'; // asc, desc
+    const sessionId = req.query.sessionId || null;
+
+    console.log(`Browse request: page=${page}, limit=${limit}, sortBy=${sortBy}, sortOrder=${sortOrder}, sessionId=${sessionId}`);
+
+    // Create cache key based on sort parameters
+    const cacheKey = `${sortBy}-${sortOrder}`;
+    let sortedIds = null;
+    let newSessionId = sessionId;
+
+    // Check if we have a valid cached session
+    if (sessionId && browseCache.has(sessionId)) {
+      const cached = browseCache.get(sessionId);
+      // Verify cache matches current sort settings
+      if (cached.cacheKey === cacheKey && Date.now() - cached.timestamp < CACHE_TTL) {
+        sortedIds = cached.ids;
+        console.log(`Using cached browse session: ${sessionId} (${sortedIds.length} documents)`);
+      } else {
+        console.log(`Cache invalid or expired for session: ${sessionId}`);
+      }
+    }
+
+    // If no valid cache, fetch and sort all document IDs
+    if (!sortedIds) {
+      console.log('Fetching and caching document IDs...');
+      
+      // Fetch all documents with payloads for sorting
+      let allPoints = [];
+      let nextOffset = null;
+      
+      do {
+        const scrollResult = await qdrantClient.scroll(COLLECTION_NAME, {
+          limit: 100,
+          offset: nextOffset,
+          with_payload: true,
+          with_vector: false
+        });
+        
+        allPoints = allPoints.concat(scrollResult.points);
+        nextOffset = scrollResult.next_page_offset;
+      } while (nextOffset !== null && nextOffset !== undefined);
+
+      console.log(`Fetched ${allPoints.length} documents for sorting`);
+
+      // Sort documents based on sortBy parameter
+      if (sortBy === 'filename') {
+        allPoints.sort((a, b) => {
+          const nameA = (a.payload.filename || a.payload.title || '').toLowerCase();
+          const nameB = (b.payload.filename || b.payload.title || '').toLowerCase();
+          const cmp = nameA.localeCompare(nameB);
+          return sortOrder === 'asc' ? cmp : -cmp;
+        });
+      } else if (sortBy === 'date') {
+        allPoints.sort((a, b) => {
+          const dateA = a.payload.date || a.payload.created_at || '';
+          const dateB = b.payload.date || b.payload.created_at || '';
+          const cmp = dateA.localeCompare(dateB);
+          return sortOrder === 'asc' ? cmp : -cmp;
+        });
+      } else if (sortBy === 'category') {
+        allPoints.sort((a, b) => {
+          const catA = (a.payload.category || '').toLowerCase();
+          const catB = (b.payload.category || '').toLowerCase();
+          const cmp = catA.localeCompare(catB);
+          return sortOrder === 'asc' ? cmp : -cmp;
+        });
+      } else if (sortBy === 'id') {
+        allPoints.sort((a, b) => {
+          const idA = String(a.id);
+          const idB = String(b.id);
+          const cmp = idA.localeCompare(idB, undefined, { numeric: true });
+          return sortOrder === 'asc' ? cmp : -cmp;
+        });
+      }
+
+      // Extract just the IDs for caching
+      sortedIds = allPoints.map(p => p.id);
+      
+      // Generate new session ID and cache the sorted IDs
+      newSessionId = `browse-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      browseCache.set(newSessionId, {
+        ids: sortedIds,
+        cacheKey: cacheKey,
+        timestamp: Date.now()
+      });
+      
+      console.log(`Created new browse session: ${newSessionId}`);
+    }
+
+    // Calculate pagination
+    const total = sortedIds.length;
+    const totalPages = Math.ceil(total / limit);
     const offset = (page - 1) * limit;
+    const pageIds = sortedIds.slice(offset, offset + limit);
 
-    console.log(`Browse request: limit=${limit}, page=${page}, offset=${offset}, sortBy=${sortBy}, sortOrder=${sortOrder}`);
+    console.log(`Retrieving page ${page} (${pageIds.length} documents)`);
 
-    // Get collection info for total count
-    const info = await qdrantClient.getCollection(COLLECTION_NAME);
-    const totalDocuments = info.points_count || 0;
-
-    // Use scroll API to fetch documents
-    const scrollResult = await qdrantClient.scroll(COLLECTION_NAME, {
-      limit: limit,
-      offset: offset,
+    // Retrieve only the documents for this page
+    const retrievedPoints = await qdrantClient.retrieve(COLLECTION_NAME, {
+      ids: pageIds,
       with_payload: true,
       with_vector: false
     });
 
-    let results = scrollResult.points.map(point => ({
-      id: point.id,
-      payload: point.payload
-    }));
-
-    // Sort results based on sortBy parameter
-    if (sortBy === 'filename' && results.length > 0) {
-      results.sort((a, b) => {
-        const nameA = (a.payload.filename || a.payload.title || '').toLowerCase();
-        const nameB = (b.payload.filename || b.payload.title || '').toLowerCase();
-        return sortOrder === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
-      });
-    } else if (sortBy === 'date' && results.length > 0) {
-      results.sort((a, b) => {
-        const dateA = a.payload.date || a.payload.created_at || '';
-        const dateB = b.payload.date || b.payload.created_at || '';
-        return sortOrder === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
-      });
-    } else if (sortBy === 'category' && results.length > 0) {
-      results.sort((a, b) => {
-        const catA = (a.payload.category || '').toLowerCase();
-        const catB = (b.payload.category || '').toLowerCase();
-        return sortOrder === 'asc' ? catA.localeCompare(catB) : catB.localeCompare(catA);
-      });
-    }
-    // Default 'id' sorting is handled by Qdrant's natural order
+    // Map retrieved points back to match the sorted order
+    const pointsMap = new Map(retrievedPoints.map(p => [String(p.id), p]));
+    const results = pageIds.map(id => {
+      const point = pointsMap.get(String(id));
+      return {
+        id: point.id,
+        payload: point.payload
+      };
+    });
 
     res.json({
       success: true,
       searchType: 'browse',
-      total: totalDocuments,
+      sessionId: newSessionId,
+      total: total,
       page: page,
       limit: limit,
-      totalPages: Math.ceil(totalDocuments / limit),
+      totalPages: totalPages,
       sortBy: sortBy,
       sortOrder: sortOrder,
       results: results
