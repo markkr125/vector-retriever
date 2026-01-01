@@ -219,6 +219,40 @@ const restoreSearchFromURL = async () => {
     return // Exit early
   }
   
+  // Check for by-document search with tempFileId
+  const tempFileId = url.searchParams.get('tempFileId')
+  const fileName = url.searchParams.get('fileName')
+  if (tempFileId) {
+    try {
+      // Verify temp file still exists
+      const fileCheck = await api.get(`/temp-files/${tempFileId}`)
+      
+      // Execute by-document search with temp file ID
+      const searchParams = {
+        searchType: 'by-document',
+        tempFileId: tempFileId,
+        query: fileName || 'Uploaded Document',
+        limit: parseInt(url.searchParams.get('limit')) || 10,
+        page: parseInt(url.searchParams.get('page')) || 1
+      }
+      
+      await handleSearch(searchParams)
+      return // Exit early
+    } catch (error) {
+      console.error('Temp file restoration failed:', error)
+      if (error.response?.data?.code === 'TEMP_FILE_EXPIRED') {
+        alert('⚠️ The uploaded file has expired (1 hour limit). Please upload again to search.')
+      } else {
+        alert('Failed to restore by-document search: ' + (error.response?.data?.message || error.message))
+      }
+      // Clear the invalid temp file params
+      url.searchParams.delete('tempFileId')
+      url.searchParams.delete('fileName')
+      window.history.replaceState({}, '', url)
+      return
+    }
+  }
+  
   // Restore filters from URL
   const filtersParam = url.searchParams.get('filters')
   const queryParam = url.searchParams.get('q')
@@ -471,17 +505,31 @@ const handleSearch = async (searchParams) => {
     switch (searchParams.searchType) {
       case 'by-document':
         // Handle file upload search
-        const formData = new FormData()
-        formData.append('file', searchParams.file)
-        formData.append('limit', searchParams.limit)
-        formData.append('offset', offset)
-        
-        response = await api.post('/search/by-document', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        })
-        currentQuery.value = `📄 ${searchParams.file.name}`
+        if (searchParams.tempFileId) {
+          // Use temp file ID from URL
+          const formData = new FormData()
+          formData.append('tempFileId', searchParams.tempFileId)
+          formData.append('limit', searchParams.limit)
+          formData.append('offset', offset)
+          
+          response = await api.post('/search/by-document', formData)
+          currentQuery.value = `📄 ${searchParams.query}`
+        } else if (searchParams.file) {
+          // Direct file upload
+          const formData = new FormData()
+          formData.append('file', searchParams.file)
+          formData.append('limit', searchParams.limit)
+          formData.append('offset', offset)
+          
+          response = await api.post('/search/by-document', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            }
+          })
+          currentQuery.value = `📄 ${searchParams.file.name}`
+        } else {
+          throw new Error('No file or tempFileId provided for by-document search')
+        }
         break
         
       case 'semantic':

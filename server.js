@@ -77,9 +77,66 @@ if (PII_DETECTION_ENABLED) {
 const uploadJobs = new Map();
 let jobIdCounter = 1;
 
+// Temporary file storage for by-document search (with 1 hour TTL)
+const tempFiles = new Map();
+let tempFileIdCounter = 1;
+const TEMP_FILE_TTL = 60 * 60 * 1000; // 1 hour in milliseconds
+
 function generateJobId() {
   return `job_${Date.now()}_${jobIdCounter++}`;
 }
+
+function generateTempFileId() {
+  return `temp_${Date.now()}_${tempFileIdCounter++}`;
+}
+
+function storeTempFile(fileBuffer, filename, mimetype) {
+  const id = generateTempFileId();
+  const expiresAt = Date.now() + TEMP_FILE_TTL;
+  
+  tempFiles.set(id, {
+    id,
+    buffer: fileBuffer,
+    filename,
+    mimetype,
+    uploadedAt: Date.now(),
+    expiresAt
+  });
+  
+  console.log(`Stored temp file: ${id} (${filename}), expires at ${new Date(expiresAt).toISOString()}`);
+  return { id, expiresAt };
+}
+
+function getTempFile(id) {
+  const file = tempFiles.get(id);
+  if (!file) return null;
+  
+  // Check if expired
+  if (Date.now() > file.expiresAt) {
+    tempFiles.delete(id);
+    console.log(`Temp file expired and removed: ${id}`);
+    return null;
+  }
+  
+  return file;
+}
+
+// Cleanup expired temp files every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  let cleanedCount = 0;
+  
+  for (const [id, file] of tempFiles.entries()) {
+    if (now > file.expiresAt) {
+      tempFiles.delete(id);
+      cleanedCount++;
+    }
+  }
+  
+  if (cleanedCount > 0) {
+    console.log(`Cleaned up ${cleanedCount} expired temp files`);
+  }
+}, 10 * 60 * 1000); // Run every 10 minutes
 
 function createJob(totalFiles) {
   const jobId = generateJobId();
@@ -1304,6 +1361,63 @@ app.get('/api/stats', async (req, res) => {
 });
 
 /**
+ * POST /api/temp-files
+ * Upload a file temporarily for by-document search
+ */
+app.post('/api/temp-files', upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const { id, expiresAt } = storeTempFile(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype
+    );
+
+    res.json({
+      id,
+      filename: req.file.originalname,
+      size: req.file.size,
+      expiresAt: new Date(expiresAt).toISOString(),
+      ttlSeconds: Math.floor(TEMP_FILE_TTL / 1000)
+    });
+  } catch (error) {
+    console.error('Temp file upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/temp-files/:id
+ * Retrieve a temporary file
+ */
+app.get('/api/temp-files/:id', (req, res) => {
+  try {
+    const file = getTempFile(req.params.id);
+    
+    if (!file) {
+      return res.status(404).json({ 
+        error: 'File not found or expired',
+        message: 'Please re-upload your document to search again'
+      });
+    }
+
+    res.json({
+      id: file.id,
+      filename: file.filename,
+      size: file.buffer.length,
+      uploadedAt: new Date(file.uploadedAt).toISOString(),
+      expiresAt: new Date(file.expiresAt).toISOString()
+    });
+  } catch (error) {
+    console.error('Temp file retrieval error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/recommend
  * Find similar documents using Qdrant's recommendation API
  */
@@ -1361,45 +1475,67 @@ app.post('/api/recommend', async (req, res) => {
 
 /**
  * POST /api/search/by-document
- * Search for similar documents by uploading a file
+ * Search for similar documents by uploading a file or using a temp file ID
  * This is like "find similar" but without saving the document
  */
 app.post('/api/search/by-document', upload.single('file'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    const file = req.file;
     const limit = parseInt(req.body.limit) || 10;
     const offset = parseInt(req.body.offset) || 0;
+    const tempFileId = req.body.tempFileId;
     
-    console.log(`Processing uploaded file for search: ${file.originalname}`);
-
-    // Extract text from the uploaded file
+    let file;
+    let fileBuffer;
+    let filename;
+    
+    // Check if using temp file ID or direct upload
+    if (tempFileId) {
+      const tempFile = getTempFile(tempFileId);
+      if (!tempFile) {
+        return res.status(404).json({ 
+          error: 'File not found or expired',
+          message: 'The uploaded file has expired. Please re-upload to search again.',
+          code: 'TEMP_FILE_EXPIRED'
+        });
+      }
+      fileBuffer = tempFile.buffer;
+      filename = tempFile.filename;
+      console.log(`Using temp file for search: ${tempFileId} (${filename})`);
+    } else if (req.file) {
+      fileBuffer = req.file.buffer;
+      filename = req.file.originalname;
+      console.log(`Processing uploaded file for search: ${filename}`);
+    } else {
+      return res.status(400).json({ 
+        error: 'No file uploaded or temp file ID provided',
+        message: 'Please provide either a file or a tempFileId'
+      });
+    }
+    
+    // Extract text from the file
     let content = '';
-    const fileExt = file.originalname.split('.').pop().toLowerCase();
+    const fileExt = filename.split('.').pop().toLowerCase();
     
     try {
       if (fileExt === 'txt' || fileExt === 'md') {
-        content = file.buffer.toString('utf-8');
+        content = fileBuffer.toString('utf-8');
       } else if (fileExt === 'pdf') {
         // Use the same PDF extraction logic as the main upload
         try {
-          content = await pdfToMarkdownViaHtml(file.buffer);
+          content = await pdfToMarkdownViaHtml(fileBuffer);
         } catch (htmlError) {
           console.warn('PDF via HTML conversion failed, trying @opendocsg/pdf2md:', htmlError.message);
           try {
-            content = await pdf2md(file.buffer);
+            content = await pdf2md(fileBuffer);
           } catch (pdf2mdError) {
             console.warn('pdf2md failed, using basic text extraction:', pdf2mdError.message);
-            const pdfData = await pdfParse(file.buffer);
+            const pdfData = await pdfParse(fileBuffer);
             content = processPdfText(pdfData.text);
           }
         }
       } else if (fileExt === 'docx') {
         // Use markdown conversion for better structure preservation
-        const result = await mammoth.convertToMarkdown({ buffer: file.buffer });
+        const result = await mammoth.convertToMarkdown({ buffer: fileBuffer });
         content = result.value;
       } else {
         return res.status(400).json({ 
@@ -1418,7 +1554,7 @@ app.post('/api/search/by-document', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No text content found in file' });
     }
 
-    console.log(`Extracted ${content.length} characters from ${file.originalname}`);
+    console.log(`Extracted ${content.length} characters from ${filename}`);
 
     // Generate embedding for the content
     let embedding;
@@ -1452,9 +1588,10 @@ app.post('/api/search/by-document', upload.single('file'), async (req, res) => {
 
     res.json({
       searchType: 'by-document',
-      sourceFile: file.originalname,
+      sourceFile: filename,
       contentLength: content.length,
       total: searchResults.length,
+      tempFileId: tempFileId || undefined, // Include if used
       results: paginatedResults.map(r => ({
         id: r.id,
         score: r.score,

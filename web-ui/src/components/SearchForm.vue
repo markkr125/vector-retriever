@@ -234,6 +234,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import api from '../api'
 
 const props = defineProps({
   loading: Boolean,
@@ -255,6 +256,8 @@ const currentPage = ref(1)
 const showFilters = ref(false)
 const selectedFile = ref(null)
 const fileInput = ref(null)
+const tempFileId = ref(null) // Store temp file ID for URL persistence
+const uploadingTemp = ref(false)
 
 // Filters
 const filters = ref({
@@ -334,7 +337,7 @@ const buildFilters = () => {
 }
 
 // Submit handler
-const handleSubmit = (resetPage = true) => {
+const handleSubmit = async (resetPage = true) => {
   if (!canSubmit.value || props.loading) return
   
   // Reset to page 1 when user clicks search button
@@ -350,6 +353,30 @@ const handleSubmit = (resetPage = true) => {
   
   // Handle by-document search differently
   if (searchType.value === 'by-document') {
+    // Upload file to temp storage first if not already uploaded
+    if (selectedFile.value && !tempFileId.value) {
+      try {
+        uploadingTemp.value = true
+        const formData = new FormData()
+        formData.append('file', selectedFile.value)
+        
+        const response = await api.post('/temp-files', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
+        
+        tempFileId.value = response.data.id
+        console.log('File uploaded to temp storage:', response.data)
+      } catch (error) {
+        console.error('Failed to upload temp file:', error)
+        alert('Failed to upload file: ' + (error.response?.data?.error || error.message))
+        uploadingTemp.value = false
+        return
+      } finally {
+        uploadingTemp.value = false
+      }
+    }
+    
+    searchParams.tempFileId = tempFileId.value
     searchParams.file = selectedFile.value
     searchParams.query = selectedFile.value.name  // For display purposes
   } else {
@@ -381,6 +408,12 @@ const handleSubmit = (resetPage = true) => {
   emit('search', searchParams)
   if (searchType.value !== 'by-document') {
     updateURL(searchParams)
+  } else if (tempFileId.value) {
+    // Add tempFileId to URL for by-document searches
+    const url = new URL(window.location)
+    url.searchParams.set('tempFileId', tempFileId.value)
+    url.searchParams.set('fileName', selectedFile.value.name)
+    window.history.pushState({}, '', url)
   }
 }
 
@@ -396,6 +429,7 @@ const handleClear = () => {
   limit.value = 10
   currentPage.value = 1
   selectedFile.value = null
+  tempFileId.value = null
   if (fileInput.value) {
     fileInput.value.value = ''
   }
@@ -418,6 +452,7 @@ const handleClear = () => {
 watch(searchType, (newType, oldType) => {
   if (oldType === 'by-document' && newType !== 'by-document') {
     selectedFile.value = null
+    tempFileId.value = null
     if (fileInput.value) {
       fileInput.value.value = ''
     }
@@ -495,6 +530,14 @@ const updateURL = (searchParams) => {
     params.set('selection', currentUrl.get('selection'))
   }
   
+  // Preserve tempFileId and fileName (set by by-document search)
+  if (currentUrl.has('tempFileId')) {
+    params.set('tempFileId', currentUrl.get('tempFileId'))
+    if (currentUrl.has('fileName')) {
+      params.set('fileName', currentUrl.get('fileName'))
+    }
+  }
+  
   window.history.pushState({}, '', '?' + params.toString())
 }
 
@@ -540,9 +583,9 @@ const loadFromURL = () => {
     currentPage.value = parseInt(params.get('page'))
   }
   
-  // If URL has query, auto-search (but skip if similarTo is present, as App.vue handles that)
+  // If URL has query, auto-search (but skip if similarTo/tempFileId is present, as App.vue handles that)
   // Also skip if filters parameter is present, as App.vue handles facet filter restoration
-  if (params.has('q') && query.value.trim() && !params.has('similarTo') && !params.has('filters')) {
+  if (params.has('q') && query.value.trim() && !params.has('similarTo') && !params.has('filters') && !params.has('tempFileId')) {
     handleSubmit()
   }
 }
