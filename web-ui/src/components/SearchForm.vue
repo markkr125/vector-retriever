@@ -28,8 +28,8 @@
         >
         <label for="search-file-input" class="file-upload-label">
           <span class="upload-icon">📄</span>
-          <span v-if="!selectedFile" class="upload-text">Choose file to find similar documents</span>
-          <span v-else class="upload-text selected">{{ selectedFile.name }}</span>
+          <span v-if="!selectedFile && !restoredFileName" class="upload-text">Choose file to find similar documents</span>
+          <span v-else class="upload-text selected">{{ selectedFile?.name || restoredFileName }}</span>
           <span class="upload-hint">Supports: TXT, MD, PDF, DOCX</span>
         </label>
       </div>
@@ -258,6 +258,7 @@ const selectedFile = ref(null)
 const fileInput = ref(null)
 const tempFileId = ref(null) // Store temp file ID for URL persistence
 const uploadingTemp = ref(false)
+const restoredFileName = ref(null) // Store fileName from URL when restoring
 
 // Filters
 const filters = ref({
@@ -553,6 +554,16 @@ const loadFromURL = () => {
   if (params.has('lat')) latitude.value = parseFloat(params.get('lat'))
   if (params.has('lon')) longitude.value = parseFloat(params.get('lon'))
   if (params.has('radius')) radius.value = parseInt(params.get('radius'))
+  
+  // If tempFileId is present, restore by-document search type
+  if (params.has('tempFileId')) {
+    searchType.value = 'by-document'
+    tempFileId.value = params.get('tempFileId')
+    // Store fileName for display (we don't have the actual File object)
+    if (params.has('fileName')) {
+      restoredFileName.value = params.get('fileName')
+    }
+  }
   
   // Load filters
   if (params.has('cat')) {

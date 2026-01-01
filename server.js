@@ -1322,6 +1322,76 @@ app.post('/api/search/geo', async (req, res) => {
 });
 
 /**
+ * GET /api/browse
+ * Browse all documents with pagination and optional sorting
+ */
+app.get('/api/browse', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit || '20');
+    const page = parseInt(req.query.page || '1');
+    const sortBy = req.query.sortBy || 'id'; // id, filename, date, category
+    const sortOrder = req.query.sortOrder || 'asc'; // asc, desc
+    const offset = (page - 1) * limit;
+
+    console.log(`Browse request: limit=${limit}, page=${page}, offset=${offset}, sortBy=${sortBy}, sortOrder=${sortOrder}`);
+
+    // Get collection info for total count
+    const info = await qdrantClient.getCollection(COLLECTION_NAME);
+    const totalDocuments = info.points_count || 0;
+
+    // Use scroll API to fetch documents
+    const scrollResult = await qdrantClient.scroll(COLLECTION_NAME, {
+      limit: limit,
+      offset: offset,
+      with_payload: true,
+      with_vector: false
+    });
+
+    let results = scrollResult.points.map(point => ({
+      id: point.id,
+      payload: point.payload
+    }));
+
+    // Sort results based on sortBy parameter
+    if (sortBy === 'filename' && results.length > 0) {
+      results.sort((a, b) => {
+        const nameA = (a.payload.filename || a.payload.title || '').toLowerCase();
+        const nameB = (b.payload.filename || b.payload.title || '').toLowerCase();
+        return sortOrder === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+      });
+    } else if (sortBy === 'date' && results.length > 0) {
+      results.sort((a, b) => {
+        const dateA = a.payload.date || a.payload.created_at || '';
+        const dateB = b.payload.date || b.payload.created_at || '';
+        return sortOrder === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
+      });
+    } else if (sortBy === 'category' && results.length > 0) {
+      results.sort((a, b) => {
+        const catA = (a.payload.category || '').toLowerCase();
+        const catB = (b.payload.category || '').toLowerCase();
+        return sortOrder === 'asc' ? catA.localeCompare(catB) : catB.localeCompare(catA);
+      });
+    }
+    // Default 'id' sorting is handled by Qdrant's natural order
+
+    res.json({
+      success: true,
+      searchType: 'browse',
+      total: totalDocuments,
+      page: page,
+      limit: limit,
+      totalPages: Math.ceil(totalDocuments / limit),
+      sortBy: sortBy,
+      sortOrder: sortOrder,
+      results: results
+    });
+  } catch (error) {
+    console.error('Browse error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/stats
  * Get collection statistics
  */

@@ -6,14 +6,42 @@
         <span class="loading"></span>
         <span>Searching...</span>
       </div>
-      <div v-else-if="query" class="results-info">
+      <div v-else-if="query || searchType === 'browse'" class="results-info">
         <div class="results-title-row">
           <h2 class="results-title">
-            Search Results
+            {{ searchType === 'browse' ? '📚 Browse All Documents' : 'Search Results' }}
           </h2>
+          <!-- Browse Controls (for browse mode) -->
+          <div v-if="searchType === 'browse'" class="browse-controls-inline">
+            <label class="control-label">
+              Sort by:
+              <select v-model="browseSortBy" @change="emit('sort-change', { sortBy: browseSortBy, sortOrder: browseSortOrder })" class="control-select">
+                <option value="id">Document ID</option>
+                <option value="filename">Filename</option>
+                <option value="category">Category</option>
+                <option value="date">Date</option>
+              </select>
+            </label>
+            <label class="control-label">
+              Order:
+              <select v-model="browseSortOrder" @change="emit('sort-change', { sortBy: browseSortBy, sortOrder: browseSortOrder })" class="control-select">
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
+            </label>
+            <label class="control-label">
+              Per page:
+              <select v-model="browsePerPage" @change="emit('limit-change', browsePerPage)" class="control-select">
+                <option :value="10">10</option>
+                <option :value="20">20</option>
+                <option :value="50">50</option>
+                <option :value="100">100</option>
+              </select>
+            </label>
+          </div>
           <!-- Cluster Visualization Button -->
           <button 
-            v-if="totalResults > 0 && searchType !== 'random' && !showClusterView"
+            v-if="totalResults > 0 && searchType !== 'random' && searchType !== 'browse' && !showClusterView"
             @click="toggleClusterView" 
             class="btn-visualize-results"
             :disabled="clusterLoading"
@@ -24,7 +52,7 @@
         <div class="results-meta">
           <span class="badge badge-primary">{{ searchTypeLabel }}</span>
           <span class="results-count">{{ displayResultsCount }} results out of {{ totalResults }}</span>
-          <span class="query-text">"{{ query }}"</span>
+          <span v-if="searchType !== 'browse'" class="query-text">"{{ query }}"</span>
           <button 
             v-if="searchType === 'recommendation'"
             @click="emit('clear-similar')"
@@ -180,7 +208,7 @@
         <!-- Score Badge -->
         <div class="result-header">
           <div class="result-rank">#{{ (currentPage - 1) * limit + index + 1 }}</div>
-          <div class="result-score">
+          <div v-if="result.score !== undefined && result.score !== null" class="result-score">
             <div class="score-bar">
               <div 
                 class="score-fill" 
@@ -291,7 +319,19 @@
 
         <!-- Action Buttons -->
         <div class="result-actions">
-          <button 
+          <!-- Link version for browse mode (allows open in new tab) -->
+          <a 
+            v-if="searchType === 'browse'"
+            :href="`/search?similarTo=${result.id}`"
+            @click.prevent="$emit('find-similar', result.id)"
+            class="btn btn-secondary btn-link"
+            title="Find documents similar to this one (Ctrl+Click to open in new tab)"
+          >
+            🔍 Find Similar
+          </a>
+          <!-- Button version for search results -->
+          <button
+            v-else
             @click="$emit('find-similar', result.id)"
             class="btn btn-secondary"
             title="Find documents similar to this one"
@@ -399,13 +439,26 @@ const props = defineProps({
   denseWeight: {
     type: Number,
     default: 0.7
+  },
+  browseSortBy: {
+    type: String,
+    default: 'id'
+  },
+  browseSortOrder: {
+    type: String,
+    default: 'asc'
   }
 })
 
-const emit = defineEmits(['page-change', 'find-similar', 'clear-similar', 'clear-random', 'show-pii-modal', 'refresh-results', 'scan-complete', 'filter-by-ids'])
+const emit = defineEmits(['page-change', 'find-similar', 'clear-similar', 'clear-random', 'show-pii-modal', 'refresh-results', 'scan-complete', 'filter-by-ids', 'sort-change', 'limit-change'])
 
 const expandedIds = ref(new Set())
 const scanning = ref({})
+
+// Browse controls (synced with props)
+const browseSortBy = ref(props.browseSortBy)
+const browseSortOrder = ref(props.browseSortOrder)
+const browsePerPage = ref(props.limit)
 
 // Cluster visualization state
 const scatterPlotRef = ref(null)
@@ -491,7 +544,8 @@ const searchTypeLabel = computed(() => {
     geo: '🌍 Geo-Radius Search',
     recommendation: '✨ Similar Documents',
     random: '🎲 Random Discovery',
-    facet: '📂 Browse by Filter'
+    facet: '📂 Browse by Filter',
+    browse: '📚 Browse All'
   }
   return labels[props.searchType] || 'Search'
 })
@@ -1186,6 +1240,43 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
+.browse-controls-inline {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.control-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.control-select {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: white;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.control-select:hover {
+  border-color: var(--primary-color);
+}
+
+.control-select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
 .results-title {
   font-size: 1.75rem;
   font-weight: 700;
@@ -1552,6 +1643,18 @@ onMounted(() => {
 
 .result-actions .btn {
   flex: 1;
+}
+
+.btn-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.btn-link:hover {
+  text-decoration: none;
 }
 
 .expand-btn {

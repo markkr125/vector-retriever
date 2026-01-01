@@ -8,34 +8,44 @@
             Ollama Qdrant Search
           </h1>
           <div class="header-right">
-            <div class="stats" v-if="stats">
-              <span class="stat-item">
-                <strong>{{ stats.totalDocuments }}</strong> documents
-              </span>
-              <span class="stat-item">
-                <strong>{{ stats.categories.length }}</strong> categories
-              </span>
+            <div class="nav-buttons">
+              <button @click="switchView('search')" class="btn btn-secondary btn-compact" :class="{ 'active': currentView === 'search' }">
+                🔍 Search
+              </button>
+              <button @click="switchView('clusters')" class="btn btn-secondary btn-compact" :class="{ 'active': currentView === 'clusters' }">
+                📊 Clusters
+              </button>
+              <button @click="switchView('browse')" class="btn btn-secondary btn-compact" :class="{ 'active': currentView === 'browse' }">
+                📚 Browse
+              </button>
+              <button @click="handleSurpriseMe" class="btn btn-secondary btn-compact" :disabled="loading">
+                🎲 Surprise
+              </button>
             </div>
-            <button @click="switchView('clusters')" class="btn btn-secondary" :class="{ 'active': currentView === 'clusters' }">
-              📊 Clusters
-            </button>
-            <button @click="handleSurpriseMe" class="btn btn-secondary" :disabled="loading">
-              🎲 Surprise Me
-            </button>
-            <button 
-              v-if="!hasActiveUpload" 
-              @click="showUploadModal = true" 
-              class="btn btn-add"
-            >
-              ➕ Add Document
-            </button>
-            <button 
-              v-else
-              @click="showProgressModal = true" 
-              class="btn btn-add uploading"
-            >
-              ⏳ Upload in progress...
-            </button>
+            <div class="add-document-section">
+              <button 
+                v-if="!hasActiveUpload" 
+                @click="showUploadModal = true" 
+                class="btn btn-add"
+              >
+                ➕ Add Document
+              </button>
+              <button 
+                v-else
+                @click="showProgressModal = true" 
+                class="btn btn-add uploading"
+              >
+                ⏳ Uploading...
+              </button>
+              <div class="stats" v-if="stats">
+                <span class="stat-item">
+                  <strong>{{ stats.totalDocuments }}</strong> documents
+                </span>
+                <span class="stat-item">
+                  <strong>{{ stats.categories.length }}</strong> categories
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -48,6 +58,30 @@
           v-if="currentView === 'clusters'" 
           @view-document="handleViewDocumentFromCluster"
         />
+
+        <!-- Browse All View -->
+        <div v-else-if="currentView === 'browse'" class="browse-view">
+          <ResultsList
+            :results="browseResults"
+            :loading="browseLoading"
+            query=""
+            searchType="browse"
+            :currentPage="browsePage"
+            :totalResults="browseTotal"
+            :limit="browseLimit"
+            :filters="{}"
+            :denseWeight="0"
+            :browseSortBy="browseSortBy"
+            :browseSortOrder="browseSortOrder"
+            @page-change="handleBrowsePageChange"
+            @sort-change="handleBrowseSortChange"
+            @limit-change="handleBrowseLimitChange"
+            @find-similar="handleFindSimilar"
+            @show-pii-modal="handleShowPIIModal"
+            @refresh-results="loadBrowseResults"
+            @scan-complete="handleScanComplete"
+          />
+        </div>
 
         <!-- Search View (default) -->
         <template v-else>
@@ -164,12 +198,20 @@ import SearchForm from './components/SearchForm.vue'
 import UploadModal from './components/UploadModal.vue'
 import UploadProgressModal from './components/UploadProgressModal.vue'
 
-const currentView = ref('search') // 'search' or 'clusters'
+const currentView = ref('search') // 'search', 'clusters', or 'browse'
 
 // View switching with URL state management (path-based routing)
 const switchView = (view) => {
   currentView.value = view
-  const path = view === 'search' ? '/search' : '/clusters'
+  let path = '/search'
+  if (view === 'clusters') {
+    path = '/clusters'
+  } else if (view === 'browse') {
+    path = '/browse'
+    // Load browse data when switching to browse view
+    browsePage.value = 1 // Reset to first page
+    loadBrowseResults()
+  }
   const url = new URL(window.location)
   // Preserve query parameters (filters, similarTo, etc.)
   window.history.pushState({}, '', path + url.search)
@@ -180,6 +222,10 @@ const restoreViewFromURL = async () => {
   const pathname = window.location.pathname
   if (pathname === '/clusters') {
     currentView.value = 'clusters'
+  } else if (pathname === '/browse') {
+    currentView.value = 'browse'
+    // Load browse results
+    await loadBrowseResults()
   } else if (pathname === '/search' || pathname === '/') {
     currentView.value = 'search'
     // Redirect root to /search for consistency
@@ -380,6 +426,15 @@ const showScanNotification = ref(false)
 const scanNotificationData = ref({})
 const searchFormRef = ref(null)
 const activeFilters = ref([]) // Array of { type, value }
+
+// Browse mode state
+const browseResults = ref([])
+const browseLoading = ref(false)
+const browsePage = ref(1)
+const browseLimit = ref(20)
+const browseTotal = ref(0)
+const browseSortBy = ref('id')
+const browseSortOrder = ref('asc')
 
 // Computed property for upload state
 const hasActiveUpload = computed(() => !!activeJobId.value)
@@ -704,14 +759,20 @@ const handlePageChange = async (page) => {
 
 // Handle find similar
 const handleFindSimilar = async (documentId) => {
+  // Switch to search view if not already there
+  if (currentView.value !== 'search') {
+    currentView.value = 'search'
+  }
+  
   loading.value = true
   currentQuery.value = 'Similar to document #' + documentId
   searchType.value = 'recommendation'
   results.value = []
   similarDocumentId.value = documentId // Track for pagination
 
-  // Update URL with similarTo parameter
+  // Update URL with similarTo parameter and switch to /search path
   const url = new URL(window.location)
+  url.pathname = '/search'
   url.searchParams.set('similarTo', documentId)
   window.history.pushState({}, '', url)
 
@@ -750,6 +811,11 @@ const handleFindSimilar = async (documentId) => {
 
 // Handle surprise me
 const handleSurpriseMe = async () => {
+  // Switch to search view if not already there
+  if (currentView.value !== 'search') {
+    currentView.value = 'search'
+  }
+  
   loading.value = true
   currentQuery.value = 'Random Discovery'
   searchType.value = 'random'
@@ -758,6 +824,7 @@ const handleSurpriseMe = async () => {
   try {
     // Always generate a new seed for fresh randomness
     const url = new URL(window.location)
+    url.pathname = '/search'
     const seed = Date.now().toString()
     
     // Clean up old parameters
@@ -783,6 +850,56 @@ const handleSurpriseMe = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// Load browse results
+const loadBrowseResults = async () => {
+  browseLoading.value = true
+  
+  try {
+    const response = await api.get('/browse', {
+      params: {
+        limit: browseLimit.value,
+        page: browsePage.value,
+        sortBy: browseSortBy.value,
+        sortOrder: browseSortOrder.value
+      }
+    })
+    
+    browseResults.value = response.data.results || []
+    browseTotal.value = response.data.total || 0
+    
+    console.log(`Loaded ${browseResults.value.length} browse results (page ${browsePage.value})`)
+  } catch (error) {
+    console.error('Browse error:', error)
+    alert('Failed to browse documents: ' + (error.response?.data?.error || error.message))
+  } finally {
+    browseLoading.value = false
+  }
+}
+
+// Handle browse page change
+const handleBrowsePageChange = (page) => {
+  browsePage.value = page
+  loadBrowseResults()
+  
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+// Handle browse sort change
+const handleBrowseSortChange = ({ sortBy, sortOrder }) => {
+  browseSortBy.value = sortBy
+  browseSortOrder.value = sortOrder
+  browsePage.value = 1 // Reset to first page
+  loadBrowseResults()
+}
+
+// Handle browse limit change
+const handleBrowseLimitChange = (newLimit) => {
+  browseLimit.value = newLimit
+  browsePage.value = 1 // Reset to first page
+  loadBrowseResults()
 }
 
 // Handle view document from cluster visualization
@@ -1368,8 +1485,31 @@ const handleClearFilter = async () => {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 2rem;
+  gap: 1rem;
   flex-wrap: wrap;
+}
+
+.nav-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.25rem;
+  border-radius: 8px;
+}
+
+.btn-compact {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.add-document-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  align-self: center;
 }
 
 .title {
@@ -1386,8 +1526,8 @@ const handleClearFilter = async () => {
 
 .stats {
   display: flex;
-  gap: 2rem;
-  font-size: 0.95rem;
+  gap: 1.5rem;
+  font-size: 0.85rem;
 }
 
 .stat-item {
@@ -1456,4 +1596,59 @@ const handleClearFilter = async () => {
   text-align: center;
   color: var(--text-secondary);
 }
+
+/* Browse View Styles */
+.browse-view {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.browse-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.browse-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+}
+
+.browse-controls {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.browse-controls label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.browse-controls select {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  background: white;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.browse-controls select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
 </style>
+
