@@ -86,6 +86,26 @@ Welcome to the Ollama Qdrant Experiment documentation! This folder contains comp
 
 ---
 
+### [Testing Plan](TESTING_PLAN.md)
+**Testing strategy and roadmap**
+- Test stack choices (Jest/Vitest/Playwright)
+- Suggested test structure and phases
+- Coverage targets and recommended priorities
+
+**Best for:** Understanding how the test suite is organized and what to add next.
+
+---
+
+### [Test Implementation Summary](TEST_IMPLEMENTATION_COMPLETE.md)
+**What’s implemented in the test suite**
+- What tests exist (unit/integration/frontend/e2e)
+- How to run them
+- Notes about integration requirements
+
+**Best for:** Verifying what’s already in place and how to execute it.
+
+---
+
 ## 🚀 Quick Navigation
 
 ### By Use Case

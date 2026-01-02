@@ -1,0 +1,7 @@
+This is an unstructured essay document without any metadata headers.
+
+It should be recognized as an unstructured document and processed accordingly.
+The system should mark it with is_unstructured=true and has_structured_metadata=false.
+
+This type of document represents plain text content like essays, articles, or
+general documents that don't follow the structured metadata format.

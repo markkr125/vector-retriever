@@ -74,6 +74,11 @@ class InMemoryCache extends CacheStrategy {
     return Date.now() <= entry.expiresAt;
   }
 
+  async invalidate(key) {
+    // Alias for clear() method for compatibility
+    await this.clear(key);
+  }
+
   getStats() {
     return {
       strategy: 'in-memory',

@@ -1,0 +1,17 @@
+Category: hotel
+Location: Paris
+Tags: test, automated
+Price: 250
+Rating: 4.5
+Coordinates: 48.8566, 2.3522
+
+Test Hotel for Automated Testing
+
+This is a test hotel document used for automated testing. It contains structured metadata
+that should be parsed correctly by the metadata extraction system.
+
+The hotel features:
+- Comfortable rooms
+- Free WiFi
+- Breakfast included
+- Central location

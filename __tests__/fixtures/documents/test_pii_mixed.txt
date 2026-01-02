@@ -1,0 +1,13 @@
+Customer Information Record
+
+Name: John Smith
+Email: john.smith@example.com
+Phone: (555) 123-4567
+SSN: 123-45-6789
+Credit Card: 4532-1234-5678-9010
+
+This document contains multiple types of PII that should be detected
+by the PII scanning system. It's used for testing PII detection accuracy.
+
+Additional contact: jane.doe@test.com
+Mobile: 555-987-6543

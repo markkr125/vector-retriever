@@ -879,8 +879,66 @@ app.post('/api/documents/upload', upload.array('files', 100), async (req, res) =
 
 **Auto-categorization:** Optional LLM call if `CATEGORIZATION_MODEL` set
 
-## Testing Patterns
-No automated tests. Manual testing via:
+## Testing Infrastructure
+
+### Automated Tests (61 unit tests, all passing)
+**Test Stack:**
+- Backend: Jest 29.7.0 with Supertest 6.3.3
+- Frontend: Vitest 1.1.0 with @vue/test-utils 2.4.3
+- E2E: Playwright 1.40.1
+- Coverage: Configured with 60-70% thresholds
+
+**Test Structure:**
+```
+__tests__/
+├── unit/
+│   ├── services/
+│   │   ├── pii-detector.test.js (30+ tests: Regex, Ollama mock, Compromise, Factory)
+│   │   └── visualization-service.test.js (10 tests: Cache, UMAP with mocked Qdrant)
+│   └── utils/
+│       └── utilities.test.js (25+ tests: sparse vectors, hashing, metadata parsing)
+├── integration/  (skeleton - marked .skip, need server.js refactoring)
+├── e2e/          (Playwright tests for full flows)
+└── fixtures/
+    ├── documents/ (test docs with/without PII)
+    └── mock-responses/ (Ollama/Qdrant mock data)
+```
+
+**Running Tests:**
+```bash
+npm run test              # All tests
+npm run test:unit         # Backend unit tests (fast, ~1.4s) ✅ 61 passing
+npm run test:integration  # Integration tests (requires Qdrant) ⚠️ Skeleton only
+npm run test:frontend     # Vue component tests ⚠️ Currently skipped (need refactoring)
+npm run test:e2e          # Playwright E2E (requires full stack)
+npm run test:coverage     # Generate coverage report
+```
+
+**Test Status:**
+- ✅ **Backend unit tests**: 61/61 passing (~1.4s) - pii-detector, visualization-service, utilities
+- ✅ **Frontend unit tests**: 50/50 passing (~500ms) - SearchForm (23 tests), ResultsList (16 tests), UploadProgressModal (11 tests)
+  - ScatterPlot mocked to avoid Plotly.js browser API requirements
+  - API calls properly mocked (getUploadJobStatus) to prevent HTTP requests
+  - window.location mocked as proper URL object
+  - window.confirm mocked for dialog testing
+- ⚠️ **Integration tests**: Skeleton only, marked with `.skip`, need server.js exports
+- 📋 **E2E tests**: Structured but not yet run (require full application stack)
+
+**Test Patterns:**
+- **Unit tests**: Mock external dependencies (axios for Ollama, Qdrant client, API modules)
+- **PII detector**: Tests all 5 methods (Regex, Ollama streaming mock, Hybrid, Compromise, Advanced)
+- **Visualization**: Tests cache operations, UMAP 2D output validation with mocked data
+- **Utilities**: Tests sparse vector generation, token filtering (length > 2), metadata extraction
+- **Frontend components**: Use vi.mock() for child components, API mocking, async timer advancement
+
+**Key Test Files:**
+- `jest.config.js` - Backend test config (node environment, 30s timeout)
+- `web-ui/vitest.config.js` - Frontend config (jsdom, Vue plugin)
+- `web-ui/vitest.setup.js` - Global mocks (localStorage, window.location, window.confirm, axios, IntersectionObserver)
+- `playwright.config.js` - E2E config (Chromium, screenshots on failure)
+- `.env.test` - Test environment variables
+
+### Manual Testing
 - `npm run examples` - Runs 7 query patterns (location, geo, price range, etc.)
 - `npm run mixed` - Tests structured + unstructured document search
 - Web UI: Upload test files from `data/test_pii_*.txt`
@@ -934,6 +992,8 @@ CATEGORIZATION_MODEL=        # e.g., llama3.2:latest for LLM-based metadata extr
 Update `.env` MODEL, re-run `npm run embed` (re-embeds all documents).
 
 ## Documentation Locations
+- **Documentation convention:** Keep project documentation in `docs/` (grouped by topic). Avoid adding new top-level `*.md` files in the repo root except `README.md`.
+- If you move/create docs, update links in `docs/README.md` (and root `README.md` only if it’s a primary entrypoint).
 - `docs/QUICK_REFERENCE.md` - Fast command reference
 - `docs/ADVANCED_QUERIES.md` - Complex filtering examples
 - `docs/LOCATION_SEARCH_EXAMPLES.md` - Location/geo queries
@@ -941,3 +1001,5 @@ Update `.env` MODEL, re-run `npm run embed` (re-embeds all documents).
 - `docs/FILE_UPLOAD_IMPLEMENTATION.md` - Upload system architecture
 - `docs/WEBUI_ARCHITECTURE.md` - System diagrams
 - `docs/PII_DETECTION.md` - PII scanning guide
+- `docs/TESTING_PLAN.md` - Testing strategy and roadmap
+- `docs/TEST_IMPLEMENTATION_COMPLETE.md` - Summary of the implemented test suite

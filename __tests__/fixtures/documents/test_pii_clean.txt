@@ -1,0 +1,6 @@
+This is a clean document with no PII information.
+
+It contains only general information about testing and automation.
+There are no social security numbers, credit cards, emails, or phone numbers.
+
+This document should pass PII scanning with zero findings.

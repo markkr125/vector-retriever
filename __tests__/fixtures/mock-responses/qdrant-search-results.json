@@ -1,0 +1,30 @@
+{
+  "result": [
+    {
+      "id": 1,
+      "score": 0.95,
+      "version": 0,
+      "payload": {
+        "category": "hotel",
+        "location": "Paris",
+        "content": "Luxury hotel in Paris with spa and rooftop",
+        "price": 450,
+        "rating": 4.8,
+        "filename": "hotel_luxury_paris.txt"
+      }
+    },
+    {
+      "id": 2,
+      "score": 0.87,
+      "version": 0,
+      "payload": {
+        "category": "hotel",
+        "location": "London",
+        "content": "Budget hotel in central London",
+        "price": 120,
+        "rating": 4.0,
+        "filename": "hotel_budget_london.txt"
+      }
+    }
+  ]
+}
