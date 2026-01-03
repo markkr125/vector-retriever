@@ -237,6 +237,41 @@ class CollectionMetadataService {
   }
 
   /**
+   * Rename collection (update display name and description)
+   */
+  async renameCollection(collectionId, { displayName, description }) {
+    const metadata = this.cache.get(collectionId);
+    if (!metadata) {
+      throw new Error('Collection not found');
+    }
+
+    if (metadata.isDefault) {
+      throw new Error('Cannot rename default collection');
+    }
+
+    // Update metadata
+    metadata.displayName = displayName;
+    if (description !== undefined) {
+      metadata.description = description;
+    }
+
+    // Update in Qdrant
+    await this.client.setPayload(this.collectionName, {
+      points: [collectionId],
+      payload: { 
+        displayName,
+        description: description !== undefined ? description : metadata.description
+      }
+    });
+
+    // Update cache
+    this.cache.set(collectionId, metadata);
+
+    console.log(`Renamed collection ${collectionId} to: ${displayName}`);
+    return metadata;
+  }
+
+  /**
    * Delete collection
    */
   async deleteCollection(collectionId) {

@@ -93,6 +93,19 @@ Welcome to the Vector Retriever documentation! This folder contains comprehensiv
 
 ---
 
+### [Collection Rename Feature](COLLECTION_RENAME.md)
+**Inline collection renaming with validation**
+- Backend API and service implementation
+- Frontend inline editing interface
+- Validation rules (format, length, uniqueness)
+- Visual feedback and keyboard shortcuts
+- Error handling patterns
+- Usage flow and technical details
+
+**Best for:** Understanding how to rename collections and the validation constraints.
+
+---
+
 ### [Testing Plan](TESTING_PLAN.md)
 **Testing strategy and roadmap**
 - Test stack choices (Jest/Vitest/Playwright)

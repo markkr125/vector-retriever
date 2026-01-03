@@ -57,6 +57,53 @@ function createCollectionsRoutes({ collectionsService, qdrantClient }) {
     }
   });
 
+  router.patch('/collections/:collectionId', async (req, res) => {
+    try {
+      const { collectionId } = req.params;
+      const { displayName, description } = req.body;
+
+      const metadata = collectionsService.getCollection(collectionId);
+      if (!metadata) {
+        return res.status(404).json({ error: 'Collection not found' });
+      }
+
+      if (metadata.isDefault) {
+        return res.status(403).json({ error: 'Cannot rename default collection' });
+      }
+
+      if (!displayName || displayName.trim().length === 0) {
+        return res.status(400).json({ error: 'Display name is required' });
+      }
+
+      // Validate display name (alphanumeric, spaces, underscores, hyphens)
+      if (!/^[a-zA-Z0-9 _-]+$/.test(displayName)) {
+        return res.status(400).json({
+          error: 'Display name can only contain letters, numbers, spaces, underscores, and hyphens'
+        });
+      }
+
+      if (displayName.length > 50) {
+        return res.status(400).json({ error: 'Display name must be 50 characters or less' });
+      }
+
+      // Check for duplicate display name (excluding current collection)
+      const existing = collectionsService.getAllCollections();
+      if (existing.some(c => c.collectionId !== collectionId && c.displayName.toLowerCase() === displayName.toLowerCase())) {
+        return res.status(400).json({ error: 'A collection with this name already exists' });
+      }
+
+      const updated = await collectionsService.renameCollection(collectionId, {
+        displayName,
+        description
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Error renaming collection:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   router.delete('/collections/:collectionId', async (req, res) => {
     try {
       const { collectionId } = req.params;

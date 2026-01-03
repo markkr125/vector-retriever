@@ -55,6 +55,14 @@ export async function createCollection(data) {
   return response.data;
 }
 
+export async function renameCollection(collectionId, { displayName, description }) {
+  const response = await api.patch(`/collections/${collectionId}`, {
+    displayName,
+    description
+  });
+  return response.data;
+}
+
 export async function deleteCollection(collectionId) {
   const response = await api.delete(`/collections/${collectionId}`);
   return response.data;

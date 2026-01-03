@@ -160,7 +160,7 @@ api.interceptors.request.use(config => {
 
 **Component Integration:**
 - `CollectionSelector.vue` - Dropdown in header, shows document counts, quick actions, exposes `refresh()` method
-- `CollectionManagementModal.vue` - Full CRUD with search (filters by name/description) and pagination (5 per page)
+- `CollectionManagementModal.vue` - Full CRUD with search (filters by name/description), pagination (5 per page), and inline rename editing
 - `FacetBar.vue` - Watches `currentCollectionId` prop, reloads facets on change
 - `ResultsList.vue` - Receives `currentCollectionId` prop, passes to visualization API
 - All search/browse operations scoped to current collection
@@ -168,9 +168,18 @@ api.interceptors.request.use(config => {
 **API Endpoints for Collections:**
 - `GET /api/collections` - List all collections with metadata
 - `POST /api/collections` - Create new collection (validates uniqueness)
+- `PATCH /api/collections/:id` - Rename collection (validates format, uniqueness, rejects default)
 - `DELETE /api/collections/:id` - Delete collection (rejects default)
 - `POST /api/collections/:id/empty` - Remove all documents, keep collection
 - `GET /api/collections/:id/stats` - Get document count + size
+
+**Collection Rename Feature:**
+- Inline editing in CollectionManagementModal - click "✏️ Rename" to edit name + description
+- Only non-default collections can be renamed
+- Validation: Name must be alphanumeric with spaces/underscores/hyphens, max 50 chars
+- Uniqueness check: Prevents duplicate names
+- Keyboard shortcuts: Enter to save, Esc to cancel
+- Visual feedback: Purple border during edit, loading state while saving
 
 ### Vector Storage Pattern (Hybrid Search)
 All documents have **dual vectors** stored in Qdrant:

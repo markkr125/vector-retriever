@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isOpen" class="modal-overlay" @click.self="close">
+  <div v-if="isOpen" class="modal-overlay">
     <div class="modal-container">
       <div class="modal-header">
         <h2>Manage Collections</h2>
@@ -56,10 +56,12 @@
               class="collection-card"
               :class="{ 
                 active: collection.collectionId === currentCollectionId,
-                default: collection.isDefault
+                default: collection.isDefault,
+                editing: editingCollection === collection.collectionId
               }"
             >
-              <div class="collection-info">
+              <!-- View Mode -->
+              <div v-if="editingCollection !== collection.collectionId" class="collection-info">
                 <div class="collection-title">
                   <span class="icon">{{ collection.isDefault ? '🏠' : '📦' }}</span>
                   <span class="name">{{ collection.displayName }}</span>
@@ -80,29 +82,87 @@
                 </div>
               </div>
               
+              <!-- Edit Mode -->
+              <div v-else class="collection-edit-form">
+                <div class="edit-field-group">
+                  <label>Collection Name</label>
+                  <input
+                    v-model="editName"
+                    type="text"
+                    class="edit-input"
+                    placeholder="Collection name"
+                    @keyup.enter="saveRename(collection)"
+                    @keyup.esc="cancelRename"
+                  />
+                </div>
+                <div class="edit-field-group">
+                  <label>Description</label>
+                  <input
+                    v-model="editDescription"
+                    type="text"
+                    class="edit-input"
+                    placeholder="Description (optional)"
+                    @keyup.enter="saveRename(collection)"
+                    @keyup.esc="cancelRename"
+                  />
+                </div>
+                <div v-if="renameError" class="error-message">
+                  {{ renameError }}
+                </div>
+              </div>
+              
+              <!-- Action Buttons -->
               <div class="collection-actions">
-                <button
-                  v-if="collection.collectionId !== currentCollectionId"
-                  class="btn btn-sm btn-switch"
-                  @click="switchToCollection(collection.collectionId)"
-                >
-                  🔄 Switch
-                </button>
-                <button
-                  class="btn btn-sm btn-empty"
-                  @click="confirmEmpty(collection)"
-                  :disabled="emptying === collection.collectionId"
-                >
-                  {{ emptying === collection.collectionId ? '⏳ Emptying...' : '🗑️ Empty' }}
-                </button>
-                <button
-                  v-if="!collection.isDefault"
-                  class="btn btn-sm btn-delete"
-                  @click="confirmDelete(collection)"
-                  :disabled="deleting === collection.collectionId"
-                >
-                  {{ deleting === collection.collectionId ? '⏳ Deleting...' : '❌ Delete' }}
-                </button>
+                <!-- View Mode Buttons -->
+                <template v-if="editingCollection !== collection.collectionId">
+                  <button
+                    v-if="collection.collectionId !== currentCollectionId"
+                    class="btn btn-sm btn-switch"
+                    @click="switchToCollection(collection.collectionId)"
+                  >
+                    🔄 Switch
+                  </button>
+                  <button
+                    v-if="!collection.isDefault"
+                    class="btn btn-sm btn-rename"
+                    @click="startRename(collection)"
+                  >
+                    ✏️ Rename
+                  </button>
+                  <button
+                    class="btn btn-sm btn-empty"
+                    @click="confirmEmpty(collection)"
+                    :disabled="emptying === collection.collectionId"
+                  >
+                    {{ emptying === collection.collectionId ? '⏳ Emptying...' : '🗑️ Empty' }}
+                  </button>
+                  <button
+                    v-if="!collection.isDefault"
+                    class="btn btn-sm btn-delete"
+                    @click="confirmDelete(collection)"
+                    :disabled="deleting === collection.collectionId"
+                  >
+                    {{ deleting === collection.collectionId ? '⏳ Deleting...' : '❌ Delete' }}
+                  </button>
+                </template>
+                
+                <!-- Edit Mode Buttons -->
+                <template v-else>
+                  <button
+                    class="btn btn-sm btn-save"
+                    @click="saveRename(collection)"
+                    :disabled="!editName.trim() || renaming === collection.collectionId"
+                  >
+                    {{ renaming === collection.collectionId ? '⏳ Saving...' : '✅ Save' }}
+                  </button>
+                  <button
+                    class="btn btn-sm btn-cancel"
+                    @click="cancelRename"
+                    :disabled="renaming === collection.collectionId"
+                  >
+                    ❌ Cancel
+                  </button>
+                </template>
               </div>
             </div>
             
@@ -167,7 +227,8 @@ import {
     createCollection,
     deleteCollection,
     emptyCollection,
-    fetchCollections
+    fetchCollections,
+    renameCollection
 } from '../api';
 
 export default {
@@ -183,13 +244,18 @@ export default {
       default: null
     }
   },
-  emits: ['close', 'collection-created', 'collection-switched', 'collection-deleted', 'collection-emptied'],
+  emits: ['close', 'collection-created', 'collection-switched', 'collection-deleted', 'collection-emptied', 'collection-renamed'],
   setup(props, { emit }) {
     const collections = ref([]);
     const loading = ref(false);
     const creating = ref(false);
     const deleting = ref(null);
     const emptying = ref(null);
+    const renaming = ref(null);
+    const editingCollection = ref(null);
+    const editName = ref('');
+    const editDescription = ref('');
+    const renameError = ref('');
     const searchQuery = ref('');
     const currentPage = ref(1);
     const itemsPerPage = ref(5);
@@ -284,6 +350,40 @@ export default {
     const switchToCollection = (collectionId) => {
       emit('collection-switched', collectionId);
       close();
+    };
+
+    const startRename = (collection) => {
+      editingCollection.value = collection.collectionId;
+      editName.value = collection.displayName;
+      editDescription.value = collection.description || '';
+      renameError.value = '';
+    };
+
+    const cancelRename = () => {
+      editingCollection.value = null;
+      editName.value = '';
+      editDescription.value = '';
+      renameError.value = '';
+    };
+
+    const saveRename = async (collection) => {
+      renaming.value = collection.collectionId;
+      renameError.value = '';
+      
+      try {
+        await renameCollection(collection.collectionId, {
+          displayName: editName.value.trim(),
+          description: editDescription.value.trim()
+        });
+        
+        await loadCollections();
+        emit('collection-renamed', collection.collectionId);
+        cancelRename();
+      } catch (error) {
+        renameError.value = error.response?.data?.error || error.message;
+      } finally {
+        renaming.value = null;
+      }
     };
 
     const confirmEmpty = (collection) => {
@@ -411,6 +511,11 @@ export default {
       creating,
       deleting,
       emptying,
+      renaming,
+      editingCollection,
+      editName,
+      editDescription,
+      renameError,
       searchQuery,
       newCollectionName,
       newCollectionDescription,
@@ -419,6 +524,9 @@ export default {
       loadCollections,
       createCollection: createNewCollection,
       switchToCollection,
+      startRename,
+      saveRename,
+      cancelRename,
       confirmEmpty,
       confirmDelete,
       executeConfirm,
@@ -718,6 +826,70 @@ export default {
 
 .btn-delete:hover:not(:disabled) {
   background: #c0392b;
+}
+
+.btn-rename {
+  background: #9b59b6;
+  color: white;
+}
+
+.btn-rename:hover:not(:disabled) {
+  background: #8e44ad;
+}
+
+.btn-save {
+  background: #27ae60;
+  color: white;
+}
+
+.btn-save:hover:not(:disabled) {
+  background: #229954;
+}
+
+.btn-cancel {
+  background: #95a5a6;
+  color: white;
+}
+
+.btn-cancel:hover:not(:disabled) {
+  background: #7f8c8d;
+}
+
+.collection-card.editing {
+  border-color: #9b59b6;
+  background: #f4ecf7;
+}
+
+.collection-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.edit-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.edit-field-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #5a6c7d;
+}
+
+.edit-input {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.edit-input:focus {
+  outline: none;
+  border-color: #9b59b6;
 }
 
 .confirm-dialog {
