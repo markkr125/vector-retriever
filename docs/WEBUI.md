@@ -195,7 +195,7 @@ cd web-ui && npm run dev
 ## 📝 File Tree
 
 ```
-ollama-qdrant-experiment/
+vector-retriever/
 ├── server.js                         # NEW: Express API server
 ├── start-webui.sh                    # NEW: Startup script
 ├── WEBUI_SETUP.md                    # NEW: Setup guide

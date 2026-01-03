@@ -1,6 +1,6 @@
 # Documentation Index
 
-Welcome to the Ollama Qdrant Experiment documentation! This folder contains comprehensive guides and references for using this project.
+Welcome to the Vector Retriever documentation! This folder contains comprehensive guides and references for using this project.
 
 ## 📚 Documentation Files
 
@@ -129,7 +129,7 @@ Welcome to the Ollama Qdrant Experiment documentation! This folder contains comp
 1. Read [Mixed Dataset Guide](MIXED_DATASET.md) - Learn about document flexibility
 2. Study [Advanced Queries](ADVANCED_QUERIES.md) - Master complex filtering
 3. Explore [PII Detection](PII_DETECTION.md) - Implement compliance features
-4. Experiment with combining techniques
+4. Test combining different techniques
 
 **Advanced:**
 - All documents provide implementation details and best practices

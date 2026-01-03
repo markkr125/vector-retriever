@@ -1,6 +1,6 @@
-# Ollama Qdrant Experiment
+# Vector Retriever
 
-Advanced vector database experiment demonstrating **Qdrant's powerful features** with Ollama embeddings. This project showcases hybrid search, complex payload filtering, geo-queries, and multi-stage search capabilities.
+General purpose vector database application showcasing **Qdrant's powerful features** with Ollama embeddings. This project demonstrates hybrid search, complex payload filtering, geo-queries, PII detection, and interactive document visualization.
 
 ## 📑 Table of Contents
 
@@ -591,7 +591,7 @@ curl http://localhost:11434/api/embed -d '{
 ## 📝 Project Structure
 
 ```
-ollama-qdrant-experiment/
+vector-retriever/
 ├── index.js                          # CLI tool (embed/search/hybrid/examples)
 ├── server.js                         # Express API entrypoint (mounts routers + initializes services)
 ├── routes/                           # Express routers (mounted under /api)

@@ -1,4 +1,4 @@
-# Ollama Qdrant Experiment - Complete Summary
+# Vector Retriever - Complete Summary
 
 ## 🎯 What This Project Demonstrates
 

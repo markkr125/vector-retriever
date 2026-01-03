@@ -1,7 +1,7 @@
-# Testing Plan for Ollama-Qdrant-Experiment
+# Testing Plan for Vector Retriever
 
 ## Overview
-This document outlines a comprehensive testing strategy for the Ollama-Qdrant vector database experiment project, covering backend API, frontend Vue.js components, service modules, and integration tests.
+This document outlines a comprehensive testing strategy for the Vector Retriever project, covering backend API, frontend Vue.js components, service modules, and integration tests.
 
 ## Current State
 - ✅ **Automated tests implemented** (Jest backend unit/integration, Vitest frontend unit, Playwright E2E)
@@ -31,7 +31,7 @@ This document outlines a comprehensive testing strategy for the Ollama-Qdrant ve
 ## Test Structure
 
 ```
-ollama-qdrant-experiment/
+vector-retriever/
 ├── __tests__/
 │   ├── unit/
 │   │   ├── services/

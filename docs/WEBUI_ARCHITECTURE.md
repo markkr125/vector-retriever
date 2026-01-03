@@ -170,7 +170,7 @@ App.vue
 ## File Structure
 
 ```
-ollama-qdrant-experiment/
+vector-retriever/
 │
 ├── server.js                   # Express API entrypoint (mounts routers)
 ├── routes/                     # Feature routers

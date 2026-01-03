@@ -1,5 +1,5 @@
 {
-  "name": "ollama-qdrant-webui",
+  "name": "vector-retriever-webui",
   "version": "1.0.0",
   "type": "module",
   "scripts": {

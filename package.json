@@ -1,7 +1,7 @@
 {
-  "name": "ollama-qdrant-experiment",
+  "name": "vector-retriever",
   "version": "1.0.0",
-  "description": "Advanced Qdrant vector database experiment with Ollama embeddings - featuring hybrid search, complex filtering, and geo-queries",
+  "description": "General purpose vector database application with Qdrant and Ollama - featuring hybrid search, PII detection, and interactive visualization",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

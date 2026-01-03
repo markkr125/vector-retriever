@@ -1,4 +1,4 @@
-# Ollama Qdrant Experiment - AI Agent Instructions
+# Vector Retriever - AI Agent Instructions
 
 > **📝 Meta-Instruction:** When implementing new features or fixing bugs, update this file with architectural patterns, debugging tips, and integration points. Keep it current so future AI assistants understand the system's evolution.
 

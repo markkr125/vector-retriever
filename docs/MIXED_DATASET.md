@@ -2,7 +2,7 @@
 
 ## Overview
 
-This Qdrant experiment demonstrates a **powerful real-world capability**: handling heterogeneous document collections where some documents have rich structured metadata while others are plain text without any metadata.
+Vector Retriever demonstrates a **powerful real-world capability**: handling heterogeneous document collections where some documents have rich structured metadata while others are plain text without any metadata.
 
 ## Dataset Composition
 

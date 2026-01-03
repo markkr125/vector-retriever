@@ -1,6 +1,6 @@
 # Web UI
 
-Modern web interface for the Ollama-Qdrant vector search experiment.
+Modern web interface for the Vector Retriever application.
 
 ## Screenshots
 

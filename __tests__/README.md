@@ -1,6 +1,6 @@
 # Testing Documentation
 
-This document provides instructions for running and maintaining tests in the Ollama-Qdrant-Experiment project.
+This document provides instructions for running and maintaining tests in the Vector Retriever project.
 
 ## Quick Start
 
