@@ -7,9 +7,13 @@ require('dotenv').config({ quiet: true });
 
 const OLLAMA_URL = process.env.OLLAMA_URL;
 const AUTH_TOKEN = process.env.AUTH_TOKEN;
-const MODEL = process.env.MODEL;
+const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL;
 const QDRANT_URL = process.env.QDRANT_URL;
 const COLLECTION_NAME = process.env.COLLECTION_NAME || 'documents';
+
+if (!EMBEDDING_MODEL) {
+  throw new Error('Missing required env var EMBEDDING_MODEL');
+}
 
 // Initialize Qdrant client
 const qdrantClient = new QdrantClient({ url: QDRANT_URL });
@@ -26,7 +30,7 @@ async function getDenseEmbedding(text) {
       headers['Authorization'] = `Bearer ${AUTH_TOKEN}`;
     }
     const response = await axios.post(OLLAMA_URL, {
-      model: MODEL,
+      model: EMBEDDING_MODEL,
       input: text
     }, {
       headers

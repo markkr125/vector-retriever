@@ -59,7 +59,7 @@ docker-compose -f qdrant-docker-compose.yml up -d
 
 # 2. Configure environment
 cp .env.example .env
-# Edit .env: OLLAMA_URL, QDRANT_URL, MODEL=embeddinggemma:latest
+# Edit .env: OLLAMA_URL, QDRANT_URL, EMBEDDING_MODEL=embeddinggemma:latest
 
 # 3. Embed sample dataset (27 documents in sample-data/)
 npm install
@@ -937,7 +937,7 @@ app.post('/api/documents/upload', upload.array('files', 100), async (req, res) =
 - CI workflow starts a mock Ollama server for E2E to avoid depending on real models/services: `scripts/mock-ollama-server.js`.
 - E2E job sets env vars (see `.github/workflows/test.yml`):
   - `OLLAMA_URL=http://127.0.0.1:11434/api/embed`
-  - `MODEL=mock-embed`
+  - `EMBEDDING_MODEL=mock-embed`
   - `PII_DETECTION_ENABLED=false` (keep E2E fast/deterministic)
   - `QDRANT_URL=http://localhost:6333`
 - Avoid `page.waitForLoadState('networkidle')` in E2E: Vite dev server keeps an HMR websocket open and can hang CI. Prefer `domcontentloaded` + targeted waits.
@@ -1010,14 +1010,14 @@ npm run test:coverage     # Generate coverage report
 ## Key Configuration (.env)
 ```bash
 OLLAMA_URL=http://localhost:11434/api/embed
-MODEL=embeddinggemma:latest
+EMBEDDING_MODEL=embeddinggemma:latest
 QDRANT_URL=http://localhost:6333
 COLLECTION_NAME=documents
 
 # PII Detection
 PII_DETECTION_ENABLED=true
 PII_DETECTION_METHOD=hybrid  # ollama|regex|hybrid|compromise|advanced
-PII_DETECTION_MODEL=gemma3:4b  # Optional, defaults to MODEL
+PII_DETECTION_MODEL=gemma3:4b  # Optional, defaults to EMBEDDING_MODEL
 
 # Visualization
 VIZ_CACHE_STRATEGY=memory    # memory|redis
@@ -1041,7 +1041,7 @@ CATEGORIZATION_MODEL=        # e.g., llama3.2:latest for LLM-based metadata extr
 E2E tests should not depend on downloading Ollama models or running real inference in CI.
 
 - Mock server: `scripts/mock-ollama-server.js` implements `POST /api/embed`, `POST /api/show`, and streamed `POST /api/chat`.
-- Workflow: `.github/workflows/test.yml` starts the mock server in the `e2e-tests` job and sets `OLLAMA_URL=http://127.0.0.1:11434/api/embed` + `MODEL=mock-embed`.
+- Workflow: `.github/workflows/test.yml` starts the mock server in the `e2e-tests` job and sets `OLLAMA_URL=http://127.0.0.1:11434/api/embed` + `EMBEDDING_MODEL=mock-embed`.
 - Default CI setting: `PII_DETECTION_ENABLED=false` for E2E to keep runs deterministic and fast.
 
 ## When Modifying Code
@@ -1060,7 +1060,7 @@ E2E tests should not depend on downloading Ollama models or running real inferen
 3. Add payload indexes if filtering by new fields
 
 ### Changing embedding model
-Update `.env` MODEL, re-run `npm run embed` (re-embeds all documents).
+Update `.env` EMBEDDING_MODEL, re-run `npm run embed` (re-embeds all documents).
 
 ## Documentation Locations
 - **Documentation convention:** Keep project documentation in `docs/` (grouped by topic). Avoid adding new top-level `*.md` files in the repo root except `README.md`.

@@ -32,16 +32,20 @@ app.use(express.json());
 // Configuration
 const OLLAMA_URL = process.env.OLLAMA_URL;
 const AUTH_TOKEN = process.env.AUTH_TOKEN;
-const MODEL = process.env.MODEL;
+const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL;
 const QDRANT_URL = process.env.QDRANT_URL;
 const COLLECTION_NAME = process.env.COLLECTION_NAME || 'documents';
 const MAX_FILE_SIZE_MB = parseInt(process.env.MAX_FILE_SIZE_MB || '10', 10);
 const CATEGORIZATION_MODEL = process.env.CATEGORIZATION_MODEL || '';
 
+if (!EMBEDDING_MODEL) {
+  throw new Error('Missing required env var EMBEDDING_MODEL');
+}
+
 // PII Detection Configuration
 const PII_DETECTION_ENABLED = process.env.PII_DETECTION_ENABLED === 'true';
 const PII_DETECTION_METHOD = process.env.PII_DETECTION_METHOD || 'hybrid';
-const PII_DETECTION_MODEL = process.env.PII_DETECTION_MODEL || CATEGORIZATION_MODEL || MODEL;
+const PII_DETECTION_MODEL = process.env.PII_DETECTION_MODEL || CATEGORIZATION_MODEL || EMBEDDING_MODEL;
 
 // Configure multer for file uploads
 const upload = multer({
@@ -73,7 +77,7 @@ const embeddingService = createEmbeddingService({
   axios,
   ollamaUrl: OLLAMA_URL,
   authToken: AUTH_TOKEN,
-  model: MODEL
+  model: EMBEDDING_MODEL
 });
 
 const { createCategorizationService } = require('./services/categorization-service');

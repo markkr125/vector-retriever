@@ -931,7 +931,7 @@ export default defineConfig({
 ```bash
 # Test environment configuration
 OLLAMA_URL=http://localhost:11434/api/embed
-MODEL=embeddinggemma:latest
+EMBEDDING_MODEL=embeddinggemma:latest
 QDRANT_URL=http://localhost:6333
 COLLECTION_NAME=test_documents
 

@@ -66,7 +66,7 @@ Ensure your `.env` file has these settings:
 ```env
 # Ollama API
 OLLAMA_URL=http://localhost:11434/api/embed
-MODEL=nomic-embed-text
+EMBEDDING_MODEL=nomic-embed-text
 
 # Qdrant
 QDRANT_URL=http://localhost:6333

@@ -251,7 +251,7 @@ Automatic detection of embedding model's token limit on server startup:
 ```javascript
 // server.js - Fetches model's num_ctx parameter
 const response = await axios.post(`${OLLAMA_URL.replace('/api/embed', '/api/show')}`, {
-  name: MODEL
+  name: EMBEDDING_MODEL
 });
 MODEL_MAX_CONTEXT_TOKENS = response.data.num_ctx || 2048;
 ```

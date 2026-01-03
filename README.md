@@ -395,7 +395,7 @@ cp .env.example .env
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OLLAMA_URL` | `http://localhost:11434/api/embed` | Ollama API endpoint for embeddings |
-| `MODEL` | `embeddinggemma:latest` | Embedding model name (must be pulled first) |
+| `EMBEDDING_MODEL` | `embeddinggemma:latest` | Embedding model name (must be pulled first) |
 | `QDRANT_URL` | `http://localhost:6333` | Qdrant vector database URL |
 | `COLLECTION_NAME` | `documents` | Name of the Qdrant collection to use |
 
@@ -412,7 +412,7 @@ cp .env.example .env
 |----------|---------|-------------|
 | `PII_DETECTION_ENABLED` | `false` | Enable automatic PII scanning on uploads |
 | `PII_DETECTION_METHOD` | `hybrid` | Detection method: `ollama`, `regex`, `hybrid`, `compromise`, `advanced` |
-| `PII_DETECTION_MODEL` | _(uses MODEL)_ | Chat model for LLM-based PII detection (recommended: `gemma3:4b`) |
+| `PII_DETECTION_MODEL` | _(uses EMBEDDING_MODEL)_ | Chat model for LLM-based PII detection (recommended: `gemma3:4b`) |
 
 > **💡 PII Detection:** Set to `true` to automatically scan uploaded documents for sensitive information (SSN, credit cards, emails, etc.). Requires a chat model. See [PII Detection Guide](docs/PII_DETECTION.md) for details.
 
@@ -473,7 +473,7 @@ cp .env.example .env
 **Using Other Models:**
 - Browse available models at [ollama.com/search?c=embedding](https://ollama.com/search?c=embedding)
 - Pull any model: `ollama pull <model-name>`
-- Update your `.env` file: `MODEL=<model-name>`
+- Update your `.env` file: `EMBEDDING_MODEL=<model-name>`
 - Re-embed your documents: `npm run embed`
 
 > **⚠️ Important:** When changing models, you must re-embed all documents as embeddings from different models are not compatible.

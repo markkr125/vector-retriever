@@ -11,9 +11,13 @@ require('dotenv').config({ quiet: true });
 
 const OLLAMA_URL = process.env.OLLAMA_URL;
 const AUTH_TOKEN = process.env.AUTH_TOKEN;
-const MODEL = process.env.MODEL;
+const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL;
 const QDRANT_URL = process.env.QDRANT_URL;
 const COLLECTION_NAME = process.env.COLLECTION_NAME || 'documents';
+
+if (!EMBEDDING_MODEL) {
+  throw new Error('Missing required env var EMBEDDING_MODEL');
+}
 
 const qdrantClient = new QdrantClient({ url: QDRANT_URL });
 
@@ -51,7 +55,7 @@ async function example1() {
     with_payload: true
   });
   
-  results.forEach((r, i) => {
+      model: EMBEDDING_MODEL,
     console.log(`\n${i + 1}. ${r.payload.filename} (Score: ${r.score.toFixed(4)})`);
     console.log(`   Location: ${r.payload.location}, Price: $${r.payload.price}`);
     console.log(`   Tags: ${r.payload.tags.join(', ')}`);
