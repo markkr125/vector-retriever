@@ -222,14 +222,14 @@
 </template>
 
 <script>
-import { computed, onMounted, ref, watch } from 'vue';
 import {
     createCollection,
     deleteCollection,
     emptyCollection,
     fetchCollections,
     renameCollection
-} from '../api';
+} from '@/api';
+import { computed, onMounted, ref, watch } from 'vue';
 
 export default {
   name: 'CollectionManagementModal',

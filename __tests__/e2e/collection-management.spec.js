@@ -79,7 +79,7 @@ test.describe('Collection Management E2E', () => {
       await expect(page.locator('.modal-overlay .modal-container')).toBeVisible();
 
       // Find a user collection (not default)
-      const userCollection = page.locator('.collection-item').filter({ hasNotText: /default/i }).first();
+      const userCollection = page.locator('.collection-card').filter({ hasNotText: /default/i }).first();
 
       if (await userCollection.isVisible()) {
         // Click empty action
@@ -112,21 +112,21 @@ test.describe('Collection Management E2E', () => {
       await expect(page.locator('.modal-overlay .modal-container')).toBeVisible();
 
       // Find E2E test collection if it exists
-      const testCollection = page.locator('.collection-item:has-text("E2E Test Collection")').first();
+      const testCollection = page.locator('.collection-card:has-text("E2E Test Collection")').first();
 
       if (await testCollection.isVisible()) {
         // Click delete
         const deleteBtn = testCollection.locator('button:has-text("Delete")');
         await deleteBtn.click();
 
-        // Confirm deletion
-        page.on('dialog', dialog => dialog.accept());
+        // Confirm via in-app confirmation dialog
+        const confirmDialog = page.locator('.confirm-dialog').first();
+        await expect(confirmDialog).toBeVisible();
 
-        // Wait for deletion
-        await page.waitForTimeout(2000);
+        await confirmDialog.locator('button.btn-confirm').click();
 
-        // Collection should be removed from list
-        await expect(page.locator('.modal-overlay .modal-container')).not.toContainText('E2E Test Collection');
+        // Collection card should be removed from list
+        await expect(page.locator('.collection-card:has-text("E2E Test Collection")')).toHaveCount(0);
       }
     }
   });
@@ -143,7 +143,7 @@ test.describe('Collection Management E2E', () => {
       await expect(page.locator('.modal-overlay .modal-container')).toBeVisible();
 
       // Find default collection
-      const defaultCollection = page.locator('.collection-item:has-text("default")').first();
+      const defaultCollection = page.locator('.collection-card:has-text("default")').first();
 
       if (await defaultCollection.isVisible()) {
         // Delete button should be disabled or not present
@@ -168,7 +168,7 @@ test.describe('Collection Management E2E', () => {
       await expect(page.locator('.modal-overlay .modal-container')).toBeVisible();
 
       // Find search input
-      const searchInput = page.locator('.modal-overlay input[type="text"]').first();
+      const searchInput = page.locator('.modal-overlay .search-input').first();
       
       if (await searchInput.isVisible()) {
         await searchInput.fill('default');
@@ -244,5 +244,49 @@ test.describe('Collection Management E2E', () => {
 
     // Complete upload flow (simplified)
     // After upload completes, document count should increase
+  });
+
+  test('rename collection', async ({ page }) => {
+    // Open collection selector dropdown
+    const collectionSelector = page.locator('.collection-button').first();
+    await collectionSelector.click();
+    await expect(page.locator('.dropdown-menu')).toBeVisible();
+
+    // Open management modal
+    const manageBtn = page.locator('.action-button.manage').first();
+    await manageBtn.click();
+    await expect(page.locator('.modal-overlay .modal-container')).toBeVisible();
+
+    // Create a collection we can rename (avoid relying on existing data)
+    const originalName = `E2E Rename ${Date.now()}`;
+    const newName = `E2E Renamed ${Date.now()}`;
+
+    await page.locator('.create-form input[type="text"]').first().fill(originalName);
+    await page.locator('.btn-create').first().click();
+
+    // Wait for collection to appear
+    await expect(page.locator('.modal-overlay .modal-container')).toContainText(originalName);
+
+    // Find that collection card
+    const card = page.locator('.collection-card').filter({ hasText: originalName }).first();
+    await expect(card).toBeVisible();
+
+    // Enter rename mode
+    await card.locator('button.btn-rename').click();
+
+    // After switching to edit mode, the originalName text may no longer be present,
+    // so locate the card by its "editing" state.
+    const editingCard = page.locator('.collection-card.editing').first();
+    await expect(editingCard).toBeVisible();
+
+    const nameInput = editingCard.locator('input.edit-input').first();
+    await expect(nameInput).toBeVisible();
+    await nameInput.fill(newName);
+
+    // Save
+    await editingCard.locator('button.btn-save').click();
+
+    // Updated name should show in modal
+    await expect(page.locator('.modal-overlay .modal-container')).toContainText(newName);
   });
 });

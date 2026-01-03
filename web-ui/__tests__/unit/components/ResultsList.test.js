@@ -321,4 +321,85 @@ describe('ResultsList.vue', () => {
     
     expect(wrapper.emitted('sort-change')).toBeTruthy();
   });
+
+  it('emits filename-filter-change (browse) after 300ms debounce', async () => {
+    vi.useFakeTimers();
+
+    wrapper = mount(ResultsList, {
+      props: {
+        results: mockResults,
+        totalResults: 2,
+        currentPage: 1,
+        limit: 20,
+        searchType: 'browse',
+        query: ''
+      }
+    });
+
+    const input = wrapper.find('input.filename-filter-input');
+    expect(input.exists()).toBe(true);
+
+    await input.setValue('hotel');
+
+    await vi.advanceTimersByTimeAsync(299);
+    expect(wrapper.emitted('filename-filter-change')).toBeFalsy();
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(wrapper.emitted('filename-filter-change')).toBeTruthy();
+    expect(wrapper.emitted('filename-filter-change')[0][0]).toEqual({ mode: 'browse', filter: 'hotel' });
+
+    vi.useRealTimers();
+  });
+
+  it('emits filename-filter-change (bookmarks) after 300ms debounce', async () => {
+    vi.useFakeTimers();
+
+    wrapper = mount(ResultsList, {
+      props: {
+        results: mockResults,
+        totalResults: 2,
+        currentPage: 1,
+        limit: 20,
+        searchType: 'bookmarks',
+        query: ''
+      }
+    });
+
+    const input = wrapper.find('input.filename-filter-input');
+    expect(input.exists()).toBe(true);
+
+    await input.setValue('rest');
+
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(wrapper.emitted('filename-filter-change')).toBeTruthy();
+    expect(wrapper.emitted('filename-filter-change')[0][0]).toEqual({ mode: 'bookmarks', filter: 'rest' });
+
+    vi.useRealTimers();
+  });
+
+  it('clears filename filter and emits empty filter immediately', async () => {
+    wrapper = mount(ResultsList, {
+      props: {
+        results: mockResults,
+        totalResults: 2,
+        currentPage: 1,
+        limit: 20,
+        searchType: 'browse',
+        query: ''
+      }
+    });
+
+    const input = wrapper.find('input.filename-filter-input');
+    await input.setValue('hotel');
+
+    const clearBtn = wrapper.find('button.clear-filter-btn');
+    expect(clearBtn.exists()).toBe(true);
+
+    await clearBtn.trigger('click');
+
+    expect(wrapper.emitted('filename-filter-change')).toBeTruthy();
+    const last = wrapper.emitted('filename-filter-change').at(-1)[0];
+    expect(last).toEqual({ mode: 'browse', filter: '' });
+  });
 });

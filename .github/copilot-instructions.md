@@ -837,6 +837,13 @@ watch: {
     }
   }
 }
+
+### Vite alias mismatch (E2E shows red overlay)
+If the UI uses imports like `@/api`, Vite must have the `@` → `src` alias configured in `web-ui/vite.config.js`.
+
+**Symptom (Playwright/E2E):** UI never renders; Vite overlay: “Failed to resolve import \"@/api\"”.
+
+**Fix:** Add `resolve.alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) }`.
 ```
 
 ### Type Coercion Patterns
