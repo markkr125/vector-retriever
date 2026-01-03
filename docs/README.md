@@ -150,8 +150,8 @@ Welcome to the Vector Retriever documentation! This folder contains comprehensiv
 
 **Code Files:**
 - `../index.js` - Main application with all search functions
-- `../examples.js` - 7 advanced filtering examples
-- `../mixed_examples.js` - Structured vs unstructured demos
+- `../examples/examples.js` - 7 advanced filtering examples
+- `../examples/mixed_examples.js` - Structured vs unstructured demos
 
 ---
 

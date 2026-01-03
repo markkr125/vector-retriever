@@ -169,7 +169,7 @@ npm run demo
 
 **Advanced Examples** (complex filtering):
 ```bash
-node examples.js
+node examples/examples.js
 ```
 
 ## 🌐 Web UI
@@ -226,7 +226,7 @@ npm run hybrid "italian restaurant with wine cellar"
 
 **Advanced Examples** (complex filtering):
 ```bash
-node examples.js
+node examples/examples.js
 ```
 
 ## 📖 Usage Examples
@@ -540,7 +540,7 @@ node index.js search "technology innovation"
 
 **Or use the mixed examples script**:
 ```bash
-node mixed_examples.js
+node examples/mixed_examples.js
 ```
 
 This demonstrates:
@@ -599,8 +599,9 @@ vector-retriever/
 ├── middleware/                       # Shared middleware (collection handling)
 ├── state/                            # In-memory state stores + cleanup timers
 ├── utils/                            # Pure helpers (metadata parsing, sparse vectors, PDF helpers)
-├── examples.js                       # 7 advanced filtering examples
-├── mixed_examples.js                 # Structured vs unstructured demos
+├── examples/                         # Example scripts
+│   ├── examples.js                   # 7 advanced filtering examples
+│   └── mixed_examples.js             # Structured vs unstructured demos
 ├── start-webui.sh                    # Web UI startup script
 ├── scripts/                          # Dev/test helper scripts
 ├── __tests__/                        # Unit/integration/e2e tests
@@ -650,7 +651,6 @@ vector-retriever/
 2. **Implement reranking**: Add a second-stage reranker for even better results
 3. **Batch processing**: Handle large document collections efficiently
 4. **Custom sparse vectors**: Integrate proper BM25 or SPLADE models
-5. **Multi-language support**: Handle non-English documents
 6. **Production deployment**: Docker Compose setup with monitoring
 
 ## 📄 License

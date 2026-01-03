@@ -153,7 +153,7 @@ node index.js hybrid "sourdough bread baking recipe"
 
 ### 3. Filtered Search (Structured Only)
 ```bash
-node examples.js
+node examples/examples.js
 # Shows 7 advanced patterns:
 # - Price + tag filtering
 # - Rating + category OR conditions

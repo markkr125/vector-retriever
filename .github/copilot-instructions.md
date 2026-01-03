@@ -46,7 +46,7 @@ docker-compose -f qdrant-docker-compose.yml up -d
 cp .env.example .env
 # Edit .env: OLLAMA_URL, QDRANT_URL, MODEL=embeddinggemma:latest
 
-# 3. Embed sample dataset (27 documents in data/)
+# 3. Embed sample dataset (27 documents in sample-data/)
 npm install
 npm run embed  # Creates 'documents' collection with hybrid vectors
 

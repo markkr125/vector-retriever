@@ -73,10 +73,10 @@ Complex filters work only on structured documents:
 
 ```bash
 # Hotels in Paris under $500
-node examples.js  # Example 1
+node examples/examples.js  # Example 1
 
 # Restaurants with rating >= 4.5
-node examples.js  # Example 2
+node examples/examples.js  # Example 2
 ```
 
 Unstructured documents lack these fields, so they won't match such filters.
@@ -84,7 +84,7 @@ Unstructured documents lack these fields, so they won't match such filters.
 ## Running Mixed Examples
 
 ```bash
-node mixed_examples.js
+node examples/mixed_examples.js
 ```
 
 This script demonstrates:
@@ -198,7 +198,7 @@ node index.js location Paris "luxury hotels"
 # Expected: Only structured Paris hotels (unstructured docs have no location)
 
 # Test 4: Statistics
-node mixed_examples.js
+node examples/mixed_examples.js
 # Expected: 21 structured + 6 unstructured = 27 total
 ```
 

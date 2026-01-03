@@ -307,7 +307,7 @@ node index.js search "family resort with waterpark and kids activities"
 
 ```bash
 # Run all advanced filtering examples
-node examples.js
+node examples/examples.js
 
 # Test location search
 node index.js location Paris "art museum"
