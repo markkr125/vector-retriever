@@ -2,6 +2,21 @@
 
 Modern web interface for the Vector Retriever application.
 
+## Table of Contents
+- [Screenshots](#screenshots)
+- [Features](#features)
+- [Technology Stack](#technology-stack)
+- [Quick Start](#quick-start)
+- [Manual Start](#manual-start)
+- [API Endpoints](#api-endpoints)
+- [Document Upload](#document-upload)
+- [Project Structure](#project-structure)
+- [Development](#development)
+- [Troubleshooting](#troubleshooting)
+- [Production Build](#production-build)
+- [Browser Support](#browser-support)
+- [License](#license)
+
 ## Screenshots
 
 ### Main Search Interface

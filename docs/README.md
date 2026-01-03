@@ -2,6 +2,13 @@
 
 Welcome to the Vector Retriever documentation! This folder contains comprehensive guides and references for using this project.
 
+## Table of Contents
+- [📚 Documentation Files](#-documentation-files)
+- [🚀 Quick Navigation](#-quick-navigation)
+- [📖 Additional Resources](#-additional-resources)
+- [🎯 Common Tasks](#-common-tasks)
+- [💡 Tips](#-tips)
+
 ## 📚 Documentation Files
 
 ### [Complete Summary](SUMMARY.md)
