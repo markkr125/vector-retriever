@@ -134,7 +134,7 @@ npm run embed
 This will:
 - Create a Qdrant collection with hybrid search support (dense + sparse vectors)
 - Set up payload indexes for fast filtering
-- Process all `.txt` files in the `data/` directory
+- Process all `.txt` files in the `sample-data/` directory
 - Generate both semantic embeddings and keyword-based sparse vectors
 - Store documents with rich metadata
 
@@ -309,12 +309,12 @@ await geoSearch('tourist attractions', 40.7128, -74.0060, 50000, 5);
 
 ## 📁 Dataset Structure
 
-The `data/` directory contains **27 documents** with both structured and unstructured formats:
+The `sample-data/` directory contains **27 documents** with both structured and unstructured formats:
 
 **21 Structured Documents (with rich metadata):**
 
 ```
-data/
+sample-data/
 ├── Hotels (4): Paris, London, Tokyo, Dubai
 ├── Restaurants (4): NYC, Boston, SF, Singapore
 ├── Attractions (3): Museums, Theme Parks, National Parks
@@ -330,7 +330,7 @@ data/
 **6 Unstructured Documents (plain text, no metadata headers):**
 
 ```
-data/
+sample-data/
 ├── unstructured_meditation_guide.txt - Mindfulness essay
 ├── unstructured_sourdough_recipe.txt - Bread making guide
 ├── unstructured_deep_learning.txt - AI/ML technical article
@@ -501,7 +501,7 @@ Found 3 results:
 
 ### Adding Custom Documents
 
-**Structured documents** (with metadata) - Create `.txt` files in `data/`:
+**Structured documents** (with metadata) - Create `.txt` files in `sample-data/`:
 
 ```
 Category: your_category
@@ -629,7 +629,7 @@ vector-retriever/
 │   ├── vite.config.js                # Vite configuration
 │   ├── package.json                  # UI dependencies
 │   └── README.md                     # Web UI documentation
-└── data/                             # Document corpus (27 files)
+└── sample-data/                      # Document corpus (27 files)
     ├── hotel_*.txt                   # Structured hotels (4)
     ├── restaurant_*.txt              # Structured restaurants (4)
     ├── attraction_*.txt              # Structured attractions (3)

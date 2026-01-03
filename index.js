@@ -598,7 +598,7 @@ async function main() {
       await runDemo();
     } else {
       console.log('Usage:');
-      console.log('  node index.js embed                          - Embed all files from data/ directory');
+      console.log('  node index.js embed                          - Embed all files from sample-data/ directory');
       console.log('  node index.js search <query>                 - Semantic search');
       console.log('  node index.js hybrid <query>                 - Hybrid search (semantic + keyword)');
       console.log('  node index.js location <city> <query>        - Search in specific location');

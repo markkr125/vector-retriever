@@ -5,7 +5,7 @@
         <div class="header-content">
           <h1 class="title" @click="switchView('search')" style="cursor: pointer;">
             <span class="icon">🔍</span>
-            Ollama Qdrant Search
+            Vector Retriever Search
           </h1>
           <div class="header-center">
             <CollectionSelector 
