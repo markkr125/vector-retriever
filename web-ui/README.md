@@ -21,7 +21,7 @@ Modern web interface for the Vector Retriever application.
 
 ### Main Search Interface
 
-![Search Interface](../docs/screenshots/webui-search.png)
+<img src="../docs/screenshots/webui-search.png" alt="Search Interface" width="700">
 
 The main interface features:
 - Multiple search types (Semantic, Hybrid, Location, Geo-radius)
@@ -31,7 +31,7 @@ The main interface features:
 
 ### Browse All Documents
 
-![Browse All](../docs/screenshots/webui-browase-all.png)
+<img src="../docs/screenshots/webui-browase-all.png" alt="Browse All" width="700">
 
 Browse and filter all documents in your collection:
 - Sort by Document ID, Filename, Category, or Date
@@ -41,7 +41,7 @@ Browse and filter all documents in your collection:
 
 ### Bookmarks
 
-![Bookmarks](../docs/screenshots/webui-bookmarks.png)
+<img src="../docs/screenshots/webui-bookmarks.png" alt="Bookmarks" width="700">
 
 Save and manage your favorite documents:
 - Star any document to bookmark it
@@ -51,7 +51,7 @@ Save and manage your favorite documents:
 
 ### Find Similar Documents
 
-![Find Similar](../docs/screenshots/webui-findsimilar.png)
+<img src="../docs/screenshots/webui-findsimilar.png" alt="Find Similar" width="700">
 
 Discover related content:
 - Click "Find Similar" on any document
@@ -61,7 +61,7 @@ Discover related content:
 
 ### Document Visualization
 
-![Visualization](../docs/screenshots/webui-visualization.png)
+<img src="../docs/screenshots/webui-visualization.png" alt="Visualization" width="700">
 
 Interactive 2D visualization of document clusters:
 - UMAP dimensionality reduction (768D → 2D)
@@ -72,7 +72,7 @@ Interactive 2D visualization of document clusters:
 
 ### Add Document - Text Input
 
-![Add Document Text](../docs/screenshots/webui-add-document-plan-text.png)
+<img src="../docs/screenshots/webui-add-document-plan-text.png" alt="Add Document Text" width="700">
 
 Direct text entry with optional metadata:
 - Filename and content fields
@@ -82,7 +82,7 @@ Direct text entry with optional metadata:
 
 ### Add Document - File Upload
 
-![Add Document Upload](../docs/screenshots/webui-add-document.png)
+<img src="../docs/screenshots/webui-add-document.png" alt="Add Document Upload" width="700">
 
 Multi-file upload with automatic processing:
 - Support for TXT, JSON, PDF, DOCX, DOC formats
@@ -92,7 +92,7 @@ Multi-file upload with automatic processing:
 
 ### Upload Progress Tracking
 
-![Upload Progress](../docs/screenshots/webui-add-document-upload-progress.png)
+<img src="../docs/screenshots/webui-add-document-upload-progress.png" alt="Upload Progress" width="700">
 
 Real-time upload monitoring:
 - File-by-file progress tracking
@@ -102,7 +102,7 @@ Real-time upload monitoring:
 
 ### Search by Uploaded File
 
-![Search by File](../docs/screenshots/webui-search-by-uploaded-file.png)
+<img src="../docs/screenshots/webui-search-by-uploaded-file.png" alt="Search by File" width="700">
 
 Find similar documents by uploading a file:
 - Upload any supported document format
@@ -112,7 +112,7 @@ Find similar documents by uploading a file:
 
 ### PII Detection & Reporting
 
-![PII Report](../docs/screenshots/webui-sensitive-data-report.png)
+<img src="../docs/screenshots/webui-sensitive-data-report.png" alt="PII Report" width="700">
 
 Comprehensive privacy compliance:
 - 5 detection methods (Regex, Ollama, Hybrid, Compromise, Advanced)
