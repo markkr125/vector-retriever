@@ -27,9 +27,9 @@
 │                 http://localhost:3001                       │
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │ server.js (40+ endpoints)                             │  │
+│  │ server.js (entrypoint - mounts routers)              │  │
 │  │                                                        │  │
-│  │  Routes:                                              │  │
+│  │  Modular Routes (routes/*.js):                       │  │
 │  │  • Collection Middleware (all search/doc routes)    │  │
 │  │  • POST /api/search/semantic                         │  │
 │  │  • POST /api/search/hybrid                           │  │
@@ -38,6 +38,9 @@
 │  │  • GET/POST/DELETE /api/collections                  │  │
 │  │  • GET  /api/stats                                   │  │
 │  │  • GET  /api/health                                  │  │
+│  │                                                        │  │
+│  │  Services (services/*.js):                           │  │
+│  │  • Embedding, PII Detection, Visualization          │  │
 │  └────────────────┬─────────────────┬───────────────────┘  │
 └─────────────────────┼─────────────────┼──────────────────────┘
                       │                 │
@@ -169,11 +172,20 @@ App.vue
 ```
 ollama-qdrant-experiment/
 │
-├── server.js                   # Express API Server
-│   ├── API Routes
-│   ├── Embedding Functions
-│   ├── Sparse Vector Generation
-│   └── Qdrant Client
+├── server.js                   # Express API entrypoint (mounts routers)
+├── routes/                     # Feature routers
+│   ├── search.js              # Search endpoints
+│   ├── collections.js         # Collection CRUD
+│   ├── uploads.js             # Upload + job tracking
+│   └── ...                    # Other feature routers
+├── services/                   # Core services
+│   ├── embedding-service.js   # Ollama embedding
+│   ├── pii-detector.js        # PII scanning
+│   ├── visualization-service.js # UMAP + caching
+│   └── ...                    # Other services
+├── middleware/                 # Shared middleware
+├── state/                      # In-memory state stores
+├── utils/                      # Pure helpers
 │
 ├── start-webui.sh             # Startup Script
 │

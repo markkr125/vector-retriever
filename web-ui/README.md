@@ -180,7 +180,7 @@ Both the API server and Vue UI support hot reload during development:
 ### Adding Features
 
 **New Search Type:**
-1. Add endpoint in `server.js`
+1. Add router endpoint in `routes/search.js` (or create new router file)
 2. Add option in `SearchForm.vue`
 3. Handle response in `App.vue`
 
@@ -203,7 +203,7 @@ Edit CSS variables in `web-ui/src/style.css`:
 ```
 
 **API Port:**
-Change in `server.js` and `web-ui/vite.config.js`
+Change `SERVER_PORT` in `.env` and proxy config in `web-ui/vite.config.js`
 
 **UI Port:**
 Change in `web-ui/vite.config.js`

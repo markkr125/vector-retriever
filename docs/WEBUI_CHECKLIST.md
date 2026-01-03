@@ -3,7 +3,12 @@
 ## Files Created ✓
 
 ### Backend (Root Directory)
-- [x] `server.js` - Express API server (400+ lines)
+- [x] `server.js` - Express API entrypoint (mounts modular routers)
+- [x] `routes/` - Feature routers (search, uploads, collections, etc.)
+- [x] `services/` - Core services (embedding, PII, visualization, etc.)
+- [x] `middleware/` - Shared middleware (collection handling)
+- [x] `state/` - In-memory state stores
+- [x] `utils/` - Pure helpers
 - [x] `start-webui.sh` - Startup script with health checks
 - [x] Updated `package.json` with new scripts and dependencies
 - [x] Updated `.env.example` with SERVER_PORT
@@ -260,7 +265,7 @@ npm run mixed          # Mixed dataset examples
 - [ ] CI/CD pipeline
 - [ ] Monitoring and logging
 - [ ] Performance optimization
-- [ ] E2E tests
+- [x] E2E tests (Playwright)
 
 ## Success Metrics ✓
 

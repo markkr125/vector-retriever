@@ -19,13 +19,13 @@ Vue.js Web UI (port 5173) ←→ Express API (port 3001) ←→ Qdrant DB (port 
 
 **Key Files:**
 - `index.js` - CLI tool for embedding & search (`npm run embed`, `npm run search`)
-- `server.js` - Express API server with **40+ endpoints** (3200+ lines) including collection management
+- `server.js` - Express API server entrypoint (mounts routers + initializes services)
 - `web-ui/src/App.vue` - Main Vue app with search/browse/bookmarks views + collection selector (1932 lines)
 - `web-ui/src/components/CollectionSelector.vue` - Header dropdown for switching collections
 - `web-ui/src/components/CollectionManagementModal.vue` - Full collection CRUD interface with search & pagination
 - `web-ui/src/components/UploadProgressModal.vue` - Real-time upload progress with animated bar, file-by-file status
-- `pii-detector.js` - Multi-method PII scanning (Ollama LLM, regex, hybrid, compromise) with Hebrew/RTL support
-- `visualization-service.js` - UMAP 768D→2D reduction with in-memory/Redis caching
+- `services/pii-detector.js` - Multi-method PII scanning (Ollama LLM, regex, hybrid, compromise) with Hebrew/RTL support
+- `services/visualization-service.js` - UMAP 768D→2D reduction with in-memory/Redis caching
 
 ### Data Flow for Search
 1. User enters query → `SearchForm.vue` → `api.js` (Axios)
@@ -93,6 +93,16 @@ node index.js geo 48.8566 2.3522 50000 "museums"
 See `main()` function for arg parsing with `process.argv`.
 
 ## Project-Specific Conventions
+
+### Backend Modularization (Routes/Services/State)
+The backend was refactored from a single large `server.js` into:
+- `routes/` - Feature routers (`express.Router()` factories) mounted under `/api`
+- `services/` - Reusable services (embedding, categorization, document processing, collections metadata)
+- `middleware/` - Shared middleware (notably `collectionMiddleware`)
+- `state/` - In-memory stores + cleanup timers (browse cache, temp files, upload jobs)
+- `utils/` - Small pure helpers (sparse vectors, metadata parsing, PDF helpers)
+
+Entry behavior is unchanged: `npm run server` runs `server.js`.
 
 ### Collections System Architecture
 **Multi-tenant document isolation** - Each collection is a separate Qdrant collection with independent documents:
@@ -196,7 +206,7 @@ Qdrant performs automatic score fusion when both dense and sparse vectors provid
 **Always include:** `filename`, `filepath`, `content`, `upload_date`, `document_id`
 
 **Metadata Extraction Pattern:**
-`parseMetadataFromContent()` in `server.js` uses regex to extract from text:
+`parseMetadataFromContent()` in `utils/metadata.js` uses regex to extract from text:
 ```javascript
 // From document headers (format: "Category: hotel")
 /^Category:\s*(.+)/im  // Sets has_structured_metadata=true
@@ -209,7 +219,7 @@ Qdrant performs automatic score fusion when both dense and sparse vectors provid
 If `CATEGORIZATION_MODEL` set (e.g., `llama3.2:latest`), server sends document to Ollama Chat API for JSON extraction. System prompt requests: category, city, coordinates, tags, price, date. Result merged into metadata.
 
 ### PII Detection Multi-Method Pattern
-`pii-detector.js` uses **factory pattern** with 5 strategies:
+`services/pii-detector.js` uses **factory pattern** with 5 strategies:
 - `OllamaPIIDetector` - LLM-based (accurate but slow)
 - `RegexPIIDetector` - Fast regex patterns (credit cards, SSN, emails)
 - `HybridPIIDetector` - Combines both with **dual-agent validation**
@@ -241,7 +251,7 @@ const escapedLine = line.replace(/"([^"]*)":/g, (match, key) => {
 **Usage:** Set `PII_DETECTION_METHOD=hybrid` in `.env`. Server auto-scans uploads, stores `pii_scan` in payload. Results show in modal with masked values.
 
 ### Visualization Caching Strategy
-`visualization-service.js` caches UMAP projections (expensive: 5-10s for 100 docs):
+`services/visualization-service.js` caches UMAP projections (expensive: 5-10s for 100 docs):
 ```javascript
 // Strategy pattern: InMemoryCache (default) or RedisCache
 VIZ_CACHE_STRATEGY=memory  // or 'redis' for distributed caching

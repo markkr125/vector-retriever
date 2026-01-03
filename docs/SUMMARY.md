@@ -261,11 +261,10 @@ To extend this project:
 1. **Scale Up**: Add 100s or 1000s of documents
 2. **Add Reranking**: Second-stage model for refinement
 3. **Implement Caching**: Cache embeddings for performance
-4. **Build API**: REST endpoint for search queries
-5. **Add UI**: Web interface for visual search
-6. **Enhanced Sparse Vectors**: Integrate SPLADE or BM25 library
-7. **Multi-language**: Support non-English documents
-8. **Batch Processing**: Parallelize embedding generation
+4. **Enhanced Sparse Vectors**: Integrate SPLADE or BM25 library
+5. **Multi-language**: Support non-English documents
+6. **Batch Processing**: Parallelize embedding generation
+7. **Production Deployment**: Docker Compose with monitoring
 
 ## 🏆 Key Achievements
 

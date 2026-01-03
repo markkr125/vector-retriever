@@ -4,13 +4,20 @@
 
 ### Backend (Root Directory)
 
-1. **server.js** - Express API server
-   - RESTful API endpoints for all search types
+1. **server.js** - Express API entrypoint
+   - Mounts modular feature routers
+   - Initializes services (embedding, PII, visualization)
    - CORS enabled for frontend communication
    - Health checks and statistics
-   - Error handling and validation
 
-2. **start-webui.sh** - Startup script
+2. **Modular Architecture**
+   - `routes/` - Feature routers (search, uploads, collections, browse, PII, visualization)
+   - `services/` - Core services (embedding, document processing, PII detection, visualization)
+   - `middleware/` - Shared middleware (collection handling)
+   - `state/` - In-memory stores (browse cache, temp files, upload jobs)
+   - `utils/` - Pure helpers (metadata parsing, sparse vectors, PDF processing)
+
+3. **start-webui.sh** - Startup script
    - Checks Qdrant and Ollama connectivity
    - Installs dependencies if needed
    - Starts both API and UI servers
@@ -175,11 +182,11 @@ cd web-ui && npm run dev
 - [ ] Rate limiting
 - [ ] WebSocket for real-time updates
 - [ ] Service worker for offline support
-- [ ] E2E tests with Playwright
+- [x] E2E tests with Playwright
 - [ ] Docker compose for full stack
 
 ### UI/UX
-- [ ] Advanced result visualization
+- [x] Advanced result visualization (UMAP clusters)
 - [ ] Comparison view
 - [ ] Search suggestions/autocomplete
 - [ ] Relevance feedback

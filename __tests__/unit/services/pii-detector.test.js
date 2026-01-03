@@ -5,7 +5,8 @@ const {
   OllamaPIIDetector,
   HybridPIIDetector,
   CompromisePIIDetector
-} = require('../../../pii-detector');
+} = require('../../../services/pii-detector');
+
 
 const fs = require('fs');
 const path = require('path');

@@ -8,7 +8,7 @@ Added an expandable cluster visualization panel directly within the search resul
 
 ### 1. Backend Service Layer
 
-**File:** `visualization-service.js`  
+**File:** `services/visualization-service.js`  
 **Lines Added:** ~250
 
 **Changes:**
@@ -44,9 +44,8 @@ async getSearchResultsVisualization(searchParams) {
 
 ### 2. API Endpoint
 
-**File:** `server.js`  
-**Lines Added:** ~40  
-**Location:** After line 2010
+**File:** `routes/visualization.js` (mounted from `server.js`)  
+**Lines Added:** ~40
 
 **Changes:**
 - Added `POST /api/visualize/search-results` endpoint:
@@ -57,7 +56,7 @@ async getSearchResultsVisualization(searchParams) {
 
 **Key Code:**
 ```javascript
-app.post('/api/visualize/search-results', async (req, res) => {
+router.post('/visualize/search-results', async (req, res) => {
   const { query, searchType, denseWeight, filters, limit, forceRefresh } = req.body;
   let queryEmbedding = null;
   if (query && (searchType === 'semantic' || searchType === 'hybrid')) {
@@ -388,8 +387,9 @@ Integration:
 
 **Dependencies:**
 - `ScatterPlot.vue` - Reusable Plotly.js component
-- `visualization-service.js` - UMAP computation and caching
-- `server.js` - API endpoints
+- `services/visualization-service.js` - UMAP computation and caching
+- `routes/visualization.js` - Visualization API endpoints
+- `server.js` - Mounts routers + initializes services
 
 **Documentation:**
 - `docs/INLINE_CLUSTER_VIEW.md` - User guide

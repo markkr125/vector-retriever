@@ -1,4 +1,4 @@
-const { VisualizationService, InMemoryCache } = require('../../../visualization-service');
+const { VisualizationService, InMemoryCache } = require('../../../services/visualization-service');
 
 describe('InMemoryCache', () => {
   let cache;

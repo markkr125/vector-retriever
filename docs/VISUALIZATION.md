@@ -348,7 +348,7 @@ No additional configuration needed. The visualization automatically:
 **Symptom:** Many points stacked on top of each other
 
 **Solutions:**
-1. Adjust UMAP parameters in `visualization-service.js`:
+1. Adjust UMAP parameters in `services/visualization-service.js`:
    - Increase `minDist` for more spread (0.1 → 0.3)
    - Decrease `nNeighbors` for looser clustering (15 → 10)
 2. Try different color schemes to distinguish overlapping categories
