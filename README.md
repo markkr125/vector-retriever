@@ -592,11 +592,18 @@ curl http://localhost:11434/api/embed -d '{
 
 ```
 ollama-qdrant-experiment/
-├── index.js                          # Main application
-├── server.js                         # Express API server
+├── index.js                          # CLI tool (embed/search/hybrid/examples)
+├── server.js                         # Express API entrypoint (mounts routers + initializes services)
+├── routes/                           # Express routers (mounted under /api)
+├── services/                         # Core services (embedding, document processing, PII, visualization)
+├── middleware/                       # Shared middleware (collection handling)
+├── state/                            # In-memory state stores + cleanup timers
+├── utils/                            # Pure helpers (metadata parsing, sparse vectors, PDF helpers)
 ├── examples.js                       # 7 advanced filtering examples
 ├── mixed_examples.js                 # Structured vs unstructured demos
 ├── start-webui.sh                    # Web UI startup script
+├── scripts/                          # Dev/test helper scripts
+├── __tests__/                        # Unit/integration/e2e tests
 ├── package.json                      # Dependencies
 ├── .env                              # Configuration (gitignored)
 ├── .env.example                      # Template configuration
@@ -607,7 +614,8 @@ ollama-qdrant-experiment/
 │   ├── QUICK_REFERENCE.md            # Fast command reference
 │   ├── MIXED_DATASET.md              # Mixed dataset handling guide
 │   ├── LOCATION_SEARCH_EXAMPLES.md   # Location/geo query examples
-│   └── ADVANCED_QUERIES.md           # Complex filtering patterns
+│   ├── ADVANCED_QUERIES.md           # Complex filtering patterns
+│   └── VISUALIZATION.md              # Document cluster visualization
 ├── web-ui/                           # Vue.js web interface
 │   ├── src/
 │   │   ├── App.vue                   # Main Vue component
@@ -642,8 +650,8 @@ ollama-qdrant-experiment/
 2. **Implement reranking**: Add a second-stage reranker for even better results
 3. **Batch processing**: Handle large document collections efficiently
 4. **Custom sparse vectors**: Integrate proper BM25 or SPLADE models
-5. **API wrapper**: Build a REST API around the search functionality
-6. **Web UI**: Create a visual interface for exploring search results
+5. **Multi-language support**: Handle non-English documents
+6. **Production deployment**: Docker Compose setup with monitoring
 
 ## 📄 License
 
