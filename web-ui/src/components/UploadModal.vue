@@ -38,7 +38,7 @@
                   type="file"
                   ref="fileInput"
                   @change="handleFileSelect"
-                  accept=".txt,.json,.pdf,.doc,.docx"
+                  :accept="acceptFileTypes"
                   class="file-input"
                   id="file-upload"
                   multiple
@@ -48,7 +48,7 @@
                   <span v-else>{{ selectedFiles.length }} file{{ selectedFiles.length > 1 ? 's' : '' }} selected</span>
                 </label>
               </div>
-              <span class="hint">Supported: .txt, .json, .pdf, .doc, .docx (max {{ maxFileSizeMB }}MB each) - Select multiple files</span>
+              <span class="hint">Supported: {{ acceptFileTypes }} (max {{ maxFileSizeMB }}MB each) - Select multiple files</span>
             </div>
 
             <div v-if="selectedFiles.length > 0" class="files-list">
@@ -274,6 +274,9 @@ const selectedFiles = ref([])
 const fileInput = ref(null)
 const maxFileSizeMB = ref(10) // Default value
 const categorizationEnabled = ref(false)
+const visionEnabled = ref(false)
+const supportedImageTypes = ref([])
+const acceptFileTypes = ref('.txt,.json,.pdf,.doc,.docx')
 const autoCategorize = ref(false)
 
 const document = ref({
@@ -317,6 +320,16 @@ const fetchConfig = async () => {
     const response = await api.get('/config')
     maxFileSizeMB.value = response.data.maxFileSizeMB
     categorizationEnabled.value = response.data.categorizationEnabled
+    visionEnabled.value = response.data.visionEnabled || false
+    supportedImageTypes.value = response.data.supportedImageTypes || []
+    
+    // Build accept file types dynamically
+    let baseTypes = '.txt,.json,.pdf,.doc,.docx'
+    if (visionEnabled.value && supportedImageTypes.value.length > 0) {
+      baseTypes += ',' + supportedImageTypes.value.join(',')
+    }
+    acceptFileTypes.value = baseTypes
+    
     // Default to checked if enabled
     if (categorizationEnabled.value) {
       autoCategorize.value = true

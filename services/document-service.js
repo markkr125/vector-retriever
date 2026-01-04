@@ -7,11 +7,14 @@ function createDocumentService({
   embeddingService,
   piiService,
   categorizationService,
+  visionService,
+  descriptionService,
   pdfParse,
   pdf2md,
   mammoth,
   piiDetectionEnabled,
-  categorizationModel
+  categorizationModel,
+  visionEnabled
 }) {
   async function processSingleFile(file, collectionName, autoCategorize = false) {
     // Decode base64-encoded filename (used to preserve UTF-8 for Hebrew/Arabic/etc)
@@ -99,8 +102,38 @@ function createDocumentService({
         console.log('DOC converted to markdown successfully');
         break;
 
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+      case 'webp':
+      case 'bmp':
+        // Process image with vision model
+        if (!visionEnabled || !visionService) {
+          throw new Error('Vision processing is not enabled. Set VISION_MODEL_ENABLED=true in .env');
+        }
+
+        console.log('Processing image with vision model...');
+        const mimeType = fileExt === 'jpg' ? 'image/jpeg' : `image/${fileExt}`;
+        const visionResult = await visionService.processImage(file.buffer, mimeType);
+
+        // Use extracted markdown content as document content
+        content = visionResult.markdownContent;
+
+        // Store vision-specific metadata
+        metadata.detected_language = visionResult.language;
+        metadata.description = visionResult.description;
+        metadata.document_type = 'image';
+        metadata.vision_processed = true;
+
+        // Optionally store base64 image for future regeneration
+        // metadata.image_data = file.buffer.toString('base64');
+
+        console.log(`✓ Image processed: ${visionResult.language} detected`);
+        break;
+
       default:
-        throw new Error(`Unsupported file type: ${fileExt}. Supported: txt, json, pdf, docx, doc`);
+        throw new Error(`Unsupported file type: ${fileExt}. Supported: txt, json, pdf, docx, doc${visionEnabled ? ', jpg, jpeg, png, gif, webp, bmp' : ''}`);
     }
 
     if (!content || content.trim().length === 0) {
@@ -296,7 +329,9 @@ function createDocumentService({
   return {
     processSingleFile,
     addDocument,
-    extractContentForSearchByDocument
+    extractContentForSearchByDocument,
+    visionService,
+    descriptionService
   };
 }
 

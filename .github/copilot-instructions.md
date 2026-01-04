@@ -661,6 +661,14 @@ Returns clear error to client instead of hanging. No automatic truncation to pre
 - Status 400 - Document exceeds model context limit
 - Status 404 - Model not pulled
 
+### Ollama Vision (Chat API with Images)
+Used for image uploads when vision is enabled.
+
+Request pattern:
+- Endpoint: `POST /api/chat`
+- Payload includes `messages` plus `images: [base64]` on the user message.
+- The response is parsed into `# Language`, `# Description`, `# Content` sections.
+
 ### Qdrant Collection Schema
 Created in `index.js:initializeCollection()`:
 - Named vectors: `dense` (768D) + `sparse` (10000D)
@@ -902,6 +910,30 @@ app.get('/api/upload-jobs/active', ...)     // Never reached
 ## File Upload Processing
 Supports: `.txt`, `.pdf`, `.docx`, `.html`, `.md`
 
+### Image Upload + Vision Processing
+Supports (when enabled): `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.bmp`
+
+**Enablement:** Image upload/processing is feature-flagged via env vars. The backend exposes `visionEnabled` + `supportedImageTypes` via `GET /api/config`, and the UI adjusts the upload `accept` attribute accordingly.
+
+**Processing flow (single model call):**
+- For images, the server calls Ollama Chat with an `images: [base64]` attachment and a prompt that returns 3 markdown sections:
+  - `# Language` (detected language of any visible text, or `unknown`)
+  - `# Description` (short but information-dense overview)
+  - `# Content` (markdown “document content” suitable for embedding)
+- The `# Content` section is used as the document’s `content` for embedding.
+
+**Stored payload fields (common):**
+- `document_type: 'image'` for image docs
+- `description` for Overview tab
+- `detected_language` when available
+- `vision_processed: true` for image docs that ran through the vision model
+
+### On-Demand Description Generation
+Endpoint: `POST /api/documents/:id/generate-description`
+- Generates/refreshes `payload.description` for documents that are missing it (or when user clicks refresh in UI).
+- For non-image docs: uses a text-only description model over the document content.
+- For images: prefers re-running vision only if raw `image_data` is available; otherwise falls back to text-only description from stored content.
+
 **PDF Parsing Fallback Chain:**
 1. Primary: `pdfjs-dist` → HTML (with table detection) → Markdown
 2. Fallback 1: `@opendocsg/pdf2md` (direct PDF→Markdown)
@@ -1013,6 +1045,14 @@ OLLAMA_URL=http://localhost:11434/api/embed
 EMBEDDING_MODEL=embeddinggemma:latest
 QDRANT_URL=http://localhost:6333
 COLLECTION_NAME=documents
+
+# Vision (optional)
+VISION_MODEL_ENABLED=false
+VISION_MODEL=gemma3:4b
+SUPPORTED_IMAGE_TYPES=.jpg,.jpeg,.png,.gif,.webp,.bmp
+
+# Description generation (optional)
+DESCRIPTION_MODEL=
 
 # PII Detection
 PII_DETECTION_ENABLED=true

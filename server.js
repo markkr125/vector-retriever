@@ -47,6 +47,12 @@ const PII_DETECTION_ENABLED = process.env.PII_DETECTION_ENABLED === 'true';
 const PII_DETECTION_METHOD = process.env.PII_DETECTION_METHOD || 'hybrid';
 const PII_DETECTION_MODEL = process.env.PII_DETECTION_MODEL || CATEGORIZATION_MODEL || EMBEDDING_MODEL;
 
+// Vision Model Configuration
+const VISION_MODEL_ENABLED = process.env.VISION_MODEL_ENABLED === 'true';
+const VISION_MODEL = process.env.VISION_MODEL || PII_DETECTION_MODEL;
+const DESCRIPTION_MODEL = process.env.DESCRIPTION_MODEL || CATEGORIZATION_MODEL || EMBEDDING_MODEL;
+const SUPPORTED_IMAGE_TYPES = process.env.SUPPORTED_IMAGE_TYPES || '.jpg,.jpeg,.png,.gif,.webp,.bmp';
+
 // Configure multer for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -102,6 +108,29 @@ if (PII_DETECTION_ENABLED) {
 const { createPiiService } = require('./services/pii-service');
 const piiService = createPiiService({ enabled: PII_DETECTION_ENABLED, detector: piiDetector });
 
+// Vision and Description services
+let visionService = null;
+let descriptionService = null;
+
+if (VISION_MODEL_ENABLED) {
+  const { createVisionService } = require('./services/vision-service');
+  visionService = createVisionService({
+    axios,
+    ollamaUrl: OLLAMA_URL,
+    authToken: AUTH_TOKEN,
+    visionModel: VISION_MODEL
+  });
+  console.log(`Vision processing enabled using ${VISION_MODEL}`);
+}
+
+const { createDescriptionService } = require('./services/description-service');
+descriptionService = createDescriptionService({
+  axios,
+  ollamaUrl: OLLAMA_URL,
+  authToken: AUTH_TOKEN,
+  descriptionModel: DESCRIPTION_MODEL
+});
+
 // Visualization
 const VIZ_CACHE_STRATEGY = process.env.VIZ_CACHE_STRATEGY || 'memory';
 const visualizationService = new VisualizationService(qdrantClient, COLLECTION_NAME, VIZ_CACHE_STRATEGY);
@@ -114,11 +143,14 @@ const documentService = createDocumentService({
   embeddingService,
   piiService,
   categorizationService,
+  visionService,
+  descriptionService,
   pdfParse,
   pdf2md,
   mammoth,
   piiDetectionEnabled: PII_DETECTION_ENABLED,
-  categorizationModel: CATEGORIZATION_MODEL
+  categorizationModel: CATEGORIZATION_MODEL,
+  visionEnabled: VISION_MODEL_ENABLED
 });
 
 const { pdfToMarkdownViaHtml, processPdfText } = require('./utils/pdf-utils');
@@ -132,6 +164,9 @@ app.use(
     categorizationEnabled: Boolean(CATEGORIZATION_MODEL),
     piiDetectionEnabled: PII_DETECTION_ENABLED,
     piiDetectionMethod: PII_DETECTION_METHOD,
+    visionEnabled: VISION_MODEL_ENABLED,
+    visionModel: VISION_MODEL,
+    supportedImageTypes: SUPPORTED_IMAGE_TYPES.split(','),
     qdrantClient
   })
 );
@@ -169,7 +204,8 @@ app.use(
   createDocumentsRoutes({
     collectionMiddleware,
     documentService,
-    collectionsService
+    collectionsService,
+    qdrantClient
   })
 );
 
