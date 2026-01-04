@@ -774,10 +774,22 @@ vector-retriever/
 ## 🚀 Next Steps
 
 1. **Add more documents**: Expand the dataset with domain-specific content
+
 2. **Implement reranking**: Add a second-stage reranker for even better results
+   - **Two-stage approach**: Vector search retrieves top 100 candidates (fast), then a cross-encoder model re-scores them (accurate)
+   - **Why it works**: Vector search excels at recall (finding relevant documents), cross-encoders excel at precision (perfect ranking)
+   - **The tradeoff**: Cross-encoders process query + document together, making them too slow for millions of docs but perfect for re-ranking finalists
+   - **Models to use**: `cross-encoder/ms-marco-MiniLM-L-6-v2` or Cohere's rerank API
+
 3. **Batch processing**: Handle large document collections efficiently
+
 4. **Custom sparse vectors**: Integrate proper BM25 or SPLADE models
-6. **Production deployment**: Docker Compose setup with monitoring
+   - **Current limitation**: This project uses simple token hashing for demonstration (counts word frequencies)
+   - **BM25**: Classic algorithm that's smarter - considers term rarity, document length, and term frequency with proper weighting
+   - **SPLADE**: Neural sparse vectors that learn semantic importance (e.g., "car" can boost "automobile" even if word doesn't appear)
+   - **Libraries**: Use `rank-bm25` (Python) or integrate SPLADE via sentence-transformers for production systems
+
+5. **Production deployment**: Docker Compose setup with monitoring
 
 ## 📄 License
 
