@@ -229,6 +229,7 @@ function createSearchRoutes({
       console.log('Query:', query);
       console.log('Limit:', limit);
       console.log('Offset:', offset);
+      console.log('Dense Weight:', denseWeight, '(using RRF fusion)');
       console.log('Has filters:', !!filters);
 
       // Debug: Log filters
@@ -246,25 +247,33 @@ function createSearchRoutes({
       const denseEmbedding = await embeddingService.getDenseEmbedding(query);
       const sparseVector = getSparseVector(query);
 
-      const searchParams = {
-        vector: {
-          name: 'dense',
-          vector: denseEmbedding
-        },
-        sparse_vector: {
-          name: 'sparse',
-          vector: sparseVector
-        },
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        with_payload: true
-      };
+      // Calculate prefetch limit based on pagination
+      // Need to fetch at least offset + limit results for proper pagination
+      const prefetchLimit = Math.max(100, parseInt(offset) + parseInt(limit) * 2);
+      console.log('Prefetch limit:', prefetchLimit, '(offset:', offset, ', limit:', limit, ')');
 
-      // Apply filters directly if in Qdrant format, otherwise build them
+      // Build prefetch queries for new query API (supports proper weight control)
+      const prefetchQueries = [
+        {
+          query: denseEmbedding,
+          using: 'dense',
+          limit: prefetchLimit, // Dynamic based on page number
+          with_payload: false
+        },
+        {
+          query: sparseVector,
+          using: 'sparse',
+          limit: prefetchLimit,
+          with_payload: false
+        }
+      ];
+
+      // Apply filters to prefetch queries if provided
+      let filterObj = null;
       if (filters) {
         // Check if filters are already in Qdrant format (has 'must' array)
         if (filters.must && Array.isArray(filters.must)) {
-          searchParams.filter = filters;
+          filterObj = filters;
         } else {
           // Legacy format: build filters from flat object
           const qdrantFilter = { must: [] };
@@ -319,26 +328,55 @@ function createSearchRoutes({
           }
 
           if (qdrantFilter.must.length > 0) {
-            searchParams.filter = qdrantFilter;
+            filterObj = qdrantFilter;
           }
         }
 
         // If filters already in Qdrant format - add documentIds if provided
         if (filters && filters.must && Array.isArray(filters.must)) {
           if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
-            searchParams.filter.must.push({
+            if (!filterObj.must) filterObj.must = [];
+            filterObj.must.push({
               has_id: documentIds
             });
           }
         }
       } else if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
         // No filters but documentIds provided
-        searchParams.filter = {
+        filterObj = {
           must: [{
             has_id: documentIds
           }]
         };
       }
+
+      // Add filter to prefetch queries
+      if (filterObj) {
+        prefetchQueries[0].filter = filterObj;
+        prefetchQueries[1].filter = filterObj;
+      }
+
+      // Build query with weighted fusion using score formula
+      // Calculate sparse weight from dense weight
+      const sparseWeight = 1 - parseFloat(denseWeight);
+      
+      console.log('Using weighted formula: dense=' + denseWeight + ', sparse=' + sparseWeight);
+      
+      const queryParams = {
+        prefetch: prefetchQueries,
+        query: {
+          formula: {
+            sum: [
+              { mult: [parseFloat(denseWeight), "$score[0]"] },  // Dense vector weight
+              { mult: [sparseWeight, "$score[1]"] }               // Sparse vector weight
+            ]
+          }
+        },
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        with_payload: true,
+        with_vector: false
+      };
 
       // Special handling for never_scanned filter with vector search
       const hasNeverScannedFilter = filters && filters.must_not &&
@@ -347,16 +385,24 @@ function createSearchRoutes({
       if (hasNeverScannedFilter) {
         // For never_scanned with vector search, we need to search all then filter
         // This is less efficient but necessary since Qdrant can't filter on missing fields
-        const largeSearchParams = {
-          ...searchParams,
+        const largeQueryParams = {
+          ...queryParams,
           limit: 1000, // Get more results to filter
-          filter: filters.must ? { must: filters.must } : undefined
         };
+        
+        // Remove must_not from prefetch filters temporarily
+        if (largeQueryParams.prefetch) {
+          largeQueryParams.prefetch.forEach(pf => {
+            if (pf.filter && filters.must) {
+              pf.filter = { must: filters.must };
+            }
+          });
+        }
 
-        const allResults = await qdrantClient.search(req.qdrantCollection, largeSearchParams);
+        const allResults = await qdrantClient.query(req.qdrantCollection, largeQueryParams);
 
         // Filter out documents that have pii_detected field
-        const filteredResults = allResults.filter(r => r.payload.pii_detected === undefined);
+        const filteredResults = allResults.points.filter(r => r.payload.pii_detected === undefined);
 
         // Paginate
         const startIdx = parseInt(offset);
@@ -372,33 +418,33 @@ function createSearchRoutes({
           total: totalEstimate,
           results: results.map(r => ({
             id: r.id,
-            score: r.score,
+            score: Math.min(r.score, 1.0),  // Cap at 1.0 (100%)
             payload: r.payload
           }))
         });
       } else {
-        const results = await qdrantClient.search(req.qdrantCollection, searchParams);
+        const results = await qdrantClient.query(req.qdrantCollection, queryParams);
 
-        console.log('Search returned:', results.length, 'results');
-        console.log('Filter being sent to countFilteredDocuments:', JSON.stringify(searchParams.filter, null, 2));
+        console.log('Query returned:', results.points.length, 'results');
+        console.log('Filter being sent to countFilteredDocuments:', JSON.stringify(filterObj, null, 2));
 
         // For vector search with filters:
         // - Count based on filter only (shows total in category/location/tag)
         // - Query affects ranking/ordering, not total count
         // - This allows proper pagination through filtered results
         let totalEstimate;
-        if (searchParams.filter && searchParams.filter.must && searchParams.filter.must.length > 0) {
+        if (filterObj && filterObj.must && filterObj.must.length > 0) {
           // Has filters - count by filter (query only affects ranking)
-          totalEstimate = await countFilteredDocuments(qdrantClient, req.qdrantCollection, searchParams.filter);
+          totalEstimate = await countFilteredDocuments(qdrantClient, req.qdrantCollection, filterObj);
           if (totalEstimate === null) {
-            totalEstimate = results.length; // Fallback if count fails
+            totalEstimate = results.points.length; // Fallback if count fails
           }
           console.log('Using countFilteredDocuments for total (has filters, query affects ranking only)');
         } else {
           // No filters - count entire collection
           totalEstimate = await countFilteredDocuments(qdrantClient, req.qdrantCollection, null);
           if (totalEstimate === null) {
-            totalEstimate = results.length; // Fallback if count fails
+            totalEstimate = results.points.length; // Fallback if count fails
           }
           console.log('Using countFilteredDocuments for total (no filters)');
         }
@@ -411,9 +457,9 @@ function createSearchRoutes({
           searchType: 'hybrid',
           denseWeight,
           total: totalEstimate,
-          results: results.map(r => ({
+          results: results.points.map(r => ({
             id: r.id,
-            score: r.score,
+            score: Math.min(r.score, 1.0),  // Cap at 1.0 (100%)
             payload: r.payload
           }))
         });
@@ -612,6 +658,7 @@ function createSearchRoutes({
       // Extract text from the file
       let content = '';
       const fileExt = filename.split('.').pop().toLowerCase();
+      const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
 
       try {
         if (fileExt === 'txt' || fileExt === 'md') {
@@ -634,9 +681,26 @@ function createSearchRoutes({
           // Use markdown conversion for better structure preservation
           const result = await mammoth.convertToMarkdown({ buffer: fileBuffer });
           content = result.value;
+        } else if (imageExtensions.includes(fileExt)) {
+          // Process image with vision model if available
+          if (!documentService.visionService) {
+            return res.status(400).json({
+              error: 'Vision processing not enabled',
+              message: 'Image uploads require vision model to be enabled. Set VISION_MODEL_ENABLED=true in .env'
+            });
+          }
+          
+          console.log(`Processing image with vision model: ${filename}`);
+          const mimeType = fileExt === 'jpg' ? 'image/jpeg' : `image/${fileExt}`;
+          const visionResult = await documentService.visionService.processImage(fileBuffer, mimeType);
+          content = visionResult.markdownContent;
+          console.log(`✓ Image processed, extracted ${content.length} characters`);
         } else {
+          const supportedFormats = documentService.visionService 
+            ? 'txt, md, pdf, docx, jpg, jpeg, png, gif, webp, bmp'
+            : 'txt, md, pdf, docx';
           return res.status(400).json({
-            error: `Unsupported file type: ${fileExt}. Supported: txt, md, pdf, docx`
+            error: `Unsupported file type: ${fileExt}. Supported: ${supportedFormats}`
           });
         }
       } catch (extractError) {

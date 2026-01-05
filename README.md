@@ -29,6 +29,7 @@ General purpose vector database application showcasing **Qdrant's powerful featu
 
 - **[Quick Reference](docs/QUICK_REFERENCE.md)** - Fast command reference and key features
 - **[Complete Summary](docs/SUMMARY.md)** - Comprehensive project overview
+- **[Hybrid Search Implementation](docs/HYBRID_SEARCH_IMPLEMENTATION.md)** - Technical guide to weighted fusion, score normalization, and deep pagination
 - **[Mixed Dataset Guide](docs/MIXED_DATASET.md)** - Handling structured + unstructured documents
 - **[Location Search Examples](docs/LOCATION_SEARCH_EXAMPLES.md)** - City and geo-radius queries
 - **[Advanced Queries](docs/ADVANCED_QUERIES.md)** - Complex filtering patterns
@@ -38,7 +39,10 @@ General purpose vector database application showcasing **Qdrant's powerful featu
 
 ### 1. **Native Hybrid Search**
 - Combines **dense vectors** (semantic/embedding-based) with **sparse vectors** (keyword/BM25-like)
-- Automatic score fusion for optimal relevance
+- **Weighted formula fusion** with explicit control via UI slider
+- Adjustable balance: 0.0 (pure keyword) to 1.0 (pure semantic), default 0.7
+- **Dynamic prefetch limits** supporting deep pagination through all results
+- Scores capped at 100% for clean, consistent display across all pages
 - Demonstrates how semantic understanding enhances keyword matching
 
 ### 2. **Document Cluster Visualization** 🆕
@@ -791,19 +795,13 @@ vector-retriever/
 
 5. **Production deployment**: Docker Compose setup with monitoring
 
-6. **Vision model support**: Process images and visual content
-   - Add multimodal embedding models (e.g., `llava`, `bakllava`) for image understanding
-   - Extract text from images (OCR) and generate visual embeddings
-   - Enable search across both text and image content
-   - Support formats: `.jpg`, `.png`, `.gif`, `.webp`, `.bmp`
-
-7. **Document analysis preview**: "Analyze Document" screen
+6. **Document analysis preview**: "Analyze Document" screen
    - Preview document content without adding it to the collection
    - Show key information: summary, entities, topics, language detection
    - Display metadata extraction preview (categories, tags, dates, pii)
    - Quick decision tool: "Should I add this document?"
 
-8. **Cloud import integration**: Import from public S3/Google Drive folders
+7. **Cloud import integration**: Import from public S3/Google Drive folders
    - **AWS S3**: Direct bucket/folder import with public URLs (no authentication required)
    - **Google Drive**: Public folder import with shared links
    - **Pre-import analysis**: Display folder stats (file count, total size, file types breakdown)

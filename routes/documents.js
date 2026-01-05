@@ -104,21 +104,35 @@ function createDocumentsRoutes({ collectionMiddleware, documentService, collecti
           payload.file_type || 'unknown'
         );
         description = result.description;
-      }
-
-      // Update document in Qdrant with new description
-      await qdrantClient.setPayload(req.qdrantCollection, {
-        points: [parsedId],
-        payload: {
-          description: description
+        
+        // Save both description and language
+        const updatePayload = { description };
+        if (result.language) {
+          updatePayload.detected_language = result.language;
         }
-      });
+
+        // Update document in Qdrant with new description and language
+        await qdrantClient.setPayload(req.qdrantCollection, {
+          points: [parsedId],
+          payload: updatePayload
+        });
+      }
 
       console.log(`✓ Generated description for document ${documentId}`);
 
+      // Fetch updated document to get the latest detected_language
+      const updatedPoints = await qdrantClient.retrieve(req.qdrantCollection, {
+        ids: [parsedId],
+        with_payload: true,
+        with_vector: false
+      });
+
+      const updatedPayload = updatedPoints[0]?.payload || {};
+
       res.json({
         success: true,
-        description: description
+        description: description,
+        detected_language: updatedPayload.detected_language || null
       });
 
     } catch (error) {

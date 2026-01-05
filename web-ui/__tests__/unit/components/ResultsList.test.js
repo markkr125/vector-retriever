@@ -218,6 +218,91 @@ describe('ResultsList.vue', () => {
     expect(wrapper.find('.pagination').exists()).toBe(true);
   });
 
+  it('renders detected language badge when present', async () => {
+    const resultsWithLanguage = [
+      {
+        id: 1,
+        score: 0.95,
+        payload: {
+          filename: 'doc.txt',
+          content: 'Hello',
+          detected_language: 'English'
+        }
+      }
+    ];
+
+    wrapper = mount(ResultsList, {
+      props: {
+        results: resultsWithLanguage,
+        totalResults: 1,
+        currentPage: 1,
+        limit: 10,
+        searchType: 'search',
+        query: 'hello'
+      }
+    });
+
+    // Expand and open overview tab
+    const card = wrapper.find('.result-card');
+    const showMoreBtn = card.findAll('.result-actions button').find(b => b.text().includes('Show More'));
+    expect(showMoreBtn).toBeTruthy();
+    await showMoreBtn.trigger('click');
+
+    const overviewTab = card.findAll('button.tab-btn').find(b => b.text().includes('Overview'));
+    expect(overviewTab).toBeTruthy();
+    await overviewTab.trigger('click');
+
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('.language-badge').exists()).toBe(true);
+    expect(wrapper.text()).toContain('English');
+  });
+
+  it('disables overview refresh for images without source image_data', async () => {
+    const imageResultNoSource = [
+      {
+        id: 1,
+        score: 0.95,
+        payload: {
+          filename: 'image.png',
+          content: 'Extracted content',
+          description: 'Existing description',
+          document_type: 'image',
+          vision_processed: true
+          // no image_data
+        }
+      }
+    ];
+
+    wrapper = mount(ResultsList, {
+      props: {
+        results: imageResultNoSource,
+        totalResults: 1,
+        currentPage: 1,
+        limit: 10,
+        searchType: 'search',
+        query: 'image'
+      }
+    });
+
+    // Expand and open overview tab
+    const card = wrapper.find('.result-card');
+    const showMoreBtn = card.findAll('.result-actions button').find(b => b.text().includes('Show More'));
+    expect(showMoreBtn).toBeTruthy();
+    await showMoreBtn.trigger('click');
+
+    const overviewTab = card.findAll('button.tab-btn').find(b => b.text().includes('Overview'));
+    expect(overviewTab).toBeTruthy();
+    await overviewTab.trigger('click');
+
+    await wrapper.vm.$nextTick();
+
+    const refreshBtn = wrapper.find('.btn.btn-refresh');
+    expect(refreshBtn.exists()).toBe(true);
+    expect(refreshBtn.attributes('disabled')).toBeDefined();
+    expect(wrapper.text()).toContain('Refresh is unavailable');
+  });
+
   it('emits page-change event', async () => {
     wrapper = mount(ResultsList, {
       props: {

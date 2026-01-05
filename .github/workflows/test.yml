@@ -133,6 +133,7 @@ jobs:
           QDRANT_URL: http://localhost:6333
           OLLAMA_URL: http://127.0.0.1:11434/api/embed
           EMBEDDING_MODEL: mock-embed
+          VISION_MODEL_ENABLED: true
           PII_DETECTION_ENABLED: false
 
       - name: Stop mock Ollama server

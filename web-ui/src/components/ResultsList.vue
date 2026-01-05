@@ -449,12 +449,22 @@
                 <button 
                   @click="generateDescription(result.id)"
                   class="btn btn-refresh"
-                  :disabled="generatingDescription.has(result.id)"
-                  :title="result.payload.description ? 'Regenerate description' : 'Generate description'"
+                  :disabled="generatingDescription.has(result.id) || (result.payload.document_type === 'image' && !result.payload.image_data)"
+                  :title="getRefreshButtonTitle(result)"
                 >
                   <span v-if="generatingDescription.has(result.id)">⏳ Generating...</span>
                   <span v-else>🔄 {{ result.payload.description ? 'Refresh' : 'Generate' }}</span>
                 </button>
+              </div>
+
+              <!-- Detected Language -->
+              <div v-if="result.payload.detected_language" class="metadata-info language-badge">
+                <span class="badge">🌐 {{ result.payload.detected_language }}</span>
+              </div>
+
+              <!-- Image without source data warning -->
+              <div v-if="result.payload.document_type === 'image' && !result.payload.image_data && result.payload.description" class="info-message">
+                ℹ️ This description was generated during upload. Refresh is unavailable because the original image was not stored.
               </div>
 
               <div v-if="result.payload.description" class="description-content" v-html="renderMarkdown(result.payload.description)"></div>
@@ -470,11 +480,6 @@
               </div>
               <div v-if="descriptionError.has(result.id)" class="error-message">
                 ❌ {{ descriptionError.get(result.id) }}
-              </div>
-
-              <!-- Language (for images) -->
-              <div v-if="result.payload.detected_language" class="metadata-info">
-                <strong>Detected Language:</strong> {{ result.payload.detected_language }}
               </div>
             </div>
 
@@ -606,6 +611,14 @@ const setActiveTab = (docId, tab) => {
   documentTabs.value.set(docId, tab)
 }
 
+// Get refresh button title based on document type and data availability
+const getRefreshButtonTitle = (result) => {
+  if (result.payload.document_type === 'image' && !result.payload.image_data) {
+    return 'Cannot refresh - original image not stored'
+  }
+  return result.payload.description ? 'Regenerate description' : 'Generate description'
+}
+
 // Generate description for a document
 const generateDescription = async (docId) => {
   generatingDescription.value.add(docId)
@@ -621,6 +634,10 @@ const generateDescription = async (docId) => {
       const result = props.results.find(r => r.id === docId)
       if (result) {
         result.payload.description = response.data.description
+        // Also update detected language if provided
+        if (response.data.detected_language) {
+          result.payload.detected_language = response.data.detected_language
+        }
       }
       console.log('Description generated successfully')
     }
@@ -2191,8 +2208,37 @@ onMounted(() => {
   margin-top: 1rem;
 }
 
+.metadata-info.language-badge {
+  background: transparent;
+  padding: 0;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.metadata-info.language-badge .badge {
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
 .metadata-info strong {
   color: var(--text-primary);
+}
+
+.info-message {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid #3b82f6;
+  border-radius: 6px;
+  color: #3b82f6;
+  font-size: 0.85rem;
+  line-height: 1.5;
 }
 
 .error-message {

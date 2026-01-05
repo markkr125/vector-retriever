@@ -682,16 +682,53 @@ const buildFiltersWithOr = () => {
   
   // Category filters (OR within category)
   if (filtersByType.category.length > 0) {
-    if (filtersByType.category.length === 1) {
+    // Special handling for "unstructured" category
+    const hasUnstructured = filtersByType.category.includes('unstructured')
+    const regularCategories = filtersByType.category.filter(c => c !== 'unstructured')
+    
+    if (hasUnstructured && regularCategories.length > 0) {
+      // Both unstructured and regular categories selected - use should (OR logic)
+      const should = []
+      
+      // Add regular categories
+      if (regularCategories.length === 1) {
+        should.push({
+          key: 'category',
+          match: { value: regularCategories[0] }
+        })
+      } else {
+        should.push({
+          key: 'category',
+          match: { any: regularCategories }
+        })
+      }
+      
+      // Add unstructured check
+      should.push({
+        key: 'is_unstructured',
+        match: { value: true }
+      })
+      
+      must.push({ should })
+    } else if (hasUnstructured) {
+      // Only unstructured selected
       must.push({
-        key: 'category',
-        match: { value: filtersByType.category[0] }
+        key: 'is_unstructured',
+        match: { value: true }
       })
     } else {
-      must.push({
-        key: 'category',
-        match: { any: filtersByType.category }
-      })
+      // Only regular categories
+      if (regularCategories.length === 1) {
+        must.push({
+          key: 'category',
+          match: { value: regularCategories[0] }
+        })
+      } else {
+        must.push({
+          key: 'category',
+          match: { any: regularCategories }
+        })
+      }
     }
   }
   

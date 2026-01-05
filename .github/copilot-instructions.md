@@ -47,7 +47,11 @@ Vue.js Web UI (port 5173) ←→ Express API (port 3001) ←→ Qdrant DB (port 
 2. Express `server.js` receives POST `/api/search/hybrid`
 3. Server calls `getDenseEmbedding()` → Ollama API → gets 768D vector
 4. Server generates sparse vector (BM25-like token frequency)
-5. Qdrant performs hybrid search with payload filtering
+5. **Qdrant Query API with weighted formula fusion:**
+   - Prefetch dense results (limit: dynamic based on page)
+   - Prefetch sparse results (limit: dynamic based on page)
+   - Apply formula: `denseWeight * dense_score + (1-denseWeight) * sparse_score`
+   - Cap scores at 1.0 (100%)
 6. Results returned with metadata → `ResultsList.vue` renders
 
 ## Critical Developer Workflows
@@ -198,11 +202,14 @@ All documents have **dual vectors** stored in Qdrant:
 
 **Why:** Qdrant's native hybrid search fuses semantic + keyword matching. Sparse vectors use simple token hashing (`simpleHash()` in `index.js`) - not production BM25, but demonstrates the concept.
 
-**Hybrid Search Scoring:**
-Qdrant performs automatic score fusion when both dense and sparse vectors provided:
-- Default `denseWeight=0.7` (70% semantic, 30% keyword)
+**Hybrid Search Scoring (Query API with Weighted Formula):**
+Uses Qdrant's Query API with prefetch + formula-based fusion:
+- **Weight parameter actively used**: `denseWeight=0.7` (70% semantic, 30% keyword)
 - Adjustable via slider in UI (0.0=pure keyword, 1.0=pure semantic)
-- Score fusion handled by Qdrant server, not client-side
+- Formula: `score = denseWeight * $score[0] + (1-denseWeight) * $score[1]`
+- Scores capped at 1.0 (100%) to prevent overflow from different vector scales
+- Dynamic prefetch limit: `Math.max(100, offset + limit * 2)` for deep pagination
+- Score fusion executed on Qdrant server via formula query
 
 ### Metadata Structure Convention
 **Structured docs** (hotels, restaurants): Rich metadata with filterable fields
