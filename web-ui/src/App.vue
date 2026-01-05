@@ -805,8 +805,8 @@ const handleSearch = async (searchParams) => {
     url.searchParams.delete('similarTo')
   }
   
-  // Only update currentQuery if searchParams has a non-empty query
-  if (searchParams.query) {
+  // Only update currentQuery if searchParams has a non-empty query (not facet-only filter search)
+  if (searchParams.query && searchParams.query.trim()) {
     currentQuery.value = searchParams.query
     // Store search params if it's a real search query (not empty)
     lastSearchParams.value = { ...searchParams }

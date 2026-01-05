@@ -64,7 +64,7 @@
         <div class="results-meta">
           <span class="badge badge-primary">{{ searchTypeLabel }}</span>
           <span class="results-count">{{ displayResultsCount }} results out of {{ totalResults }}</span>
-          <span v-if="searchType !== 'browse' && searchType !== 'bookmarks'" class="query-text">"{{ query }}"</span>
+          <span v-if="searchType !== 'browse' && searchType !== 'bookmarks' && query && query.trim()" class="query-text">"{{ query }}"</span>
           <button 
             v-if="searchType === 'recommendation'"
             @click="emit('clear-similar')"
@@ -254,7 +254,7 @@
     <!-- Results -->
     <transition-group name="slide-up" tag="div" class="results-grid">
       <div 
-        v-for="(result, index) in props.results" 
+        v-for="(result, index) in resultsWithFormattedPII" 
         :key="result.id"
         :id="`result-${result.id}`"
         :data-doc-id="result.id"
@@ -297,7 +297,7 @@
                 :title="`Click to see ${result.payload.pii_details?.length || 0} sensitive data points`"
               >
                 <span class="pii-icon">⚠️</span>
-                <span class="pii-text">{{ formatPIITypes(result.payload.pii_types) }}</span>
+                <span class="pii-text">{{ result._formattedPIITypes }}</span>
                 <span class="pii-count">{{ result.payload.pii_details?.length || 0 }}</span>
               </button>
 
@@ -855,19 +855,56 @@ const toggleExpand = (id) => {
     expandedIds.value.add(id)
   }
 }
+
+// Computed property to ensure proper reactivity for PII type formatting
+const resultsWithFormattedPII = computed(() => {
+  return props.results.map(result => {
+    const piiTypes = result.payload?.pii_types
+    let formattedPIITypes = ''
+    
+    if (piiTypes && Array.isArray(piiTypes) && piiTypes.length > 0) {
+      const icons = {
+        'credit_card': '💳',
+        'credit_card_last4': '💳',
+        'email': '📧',
+        'phone': '📞',
+        'address': '📍',
+        'ssn': '🆔',
+        'name': '👤',
+        'bank_account': '🏦',
+        'passport': '🛂',
+        'driver_license': '🚗',
+        'date_of_birth': '📅',
+        'ip_address': '🌐',
+        'medical': '🏥'
+      }
+      formattedPIITypes = piiTypes.map(t => icons[t] || '🔒').join(' ')
+    }
+    
+    return {
+      ...result,
+      _formattedPIITypes: formattedPIITypes
+    }
+  })
+})
+
 const formatPIITypes = (types) => {
   if (!types || types.length === 0) return ''
+  // Only documented PII types from PII_DETECTION.md
   const icons = {
-    credit_card: '💳',
-    email: '📧',
-    phone: '📱',
-    ssn: '🆔',
-    address: '🏠',
-    bank_account: '🏦',
-    name: '👤',
-    dob: '🎂',
-    medical: '🏥',
-    ip_address: '🌐'
+    'credit_card': '💳',
+    'credit_card_last4': '💳',
+    'email': '📧',
+    'phone': '📞',
+    'address': '📍',
+    'ssn': '🆔',
+    'name': '👤',
+    'bank_account': '🏦',
+    'passport': '🛂',
+    'driver_license': '🚗',
+    'date_of_birth': '📅',
+    'ip_address': '🌐',
+    'medical': '🏥'
   }
   return types.map(t => icons[t] || '🔒').join(' ')
 }
