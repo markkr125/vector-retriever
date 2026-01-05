@@ -5,6 +5,9 @@ function createConfigHealthRoutes({
   categorizationEnabled,
   piiDetectionEnabled,
   piiDetectionMethod,
+  visionEnabled,
+  visionModel,
+  supportedImageTypes,
   qdrantClient
 }) {
   const router = express.Router();
@@ -14,7 +17,10 @@ function createConfigHealthRoutes({
       maxFileSizeMB,
       categorizationEnabled,
       piiDetectionEnabled,
-      piiDetectionMethod
+      piiDetectionMethod,
+      visionEnabled,
+      visionModel,
+      supportedImageTypes: visionEnabled ? supportedImageTypes : []
     });
   });
 

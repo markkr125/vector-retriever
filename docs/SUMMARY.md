@@ -74,7 +74,9 @@ npm run mixed                    # Structured vs unstructured comparison
 Combining semantic understanding with keyword matching produces the best results:
 - **Semantic**: Understands synonyms, context, meaning
 - **Keyword**: Captures exact term matches, acronyms, names
-- **Fusion**: Qdrant automatically combines scores
+- **Fusion**: Weighted formula (`denseWeight * semantic + (1-denseWeight) * keyword`)
+- **Scoring**: Capped at 100%, consistent across all pages
+- **Weight Control**: Adjustable via slider (0.0=pure keyword, 1.0=pure semantic)
 
 ### Structured Enables Filtering
 Documents with metadata unlock powerful queries:
@@ -263,12 +265,13 @@ This architecture works for:
 
 ## ✨ Unique Features
 
-1. **True Hybrid Search**: Not just concatenation—proper vector fusion
+1. **True Hybrid Search**: Weighted formula fusion with explicit weight control
 2. **Automatic Document Type Detection**: No manual tagging required
 3. **Seamless Coexistence**: Structured + unstructured in same collection
 4. **Rich Filtering Options**: 7+ filter pattern demonstrations
 5. **Geo-Queries**: Real coordinate-based searches
 6. **Production-Ready Code**: Error handling, validation, indexes
+7. **Deep Pagination**: Dynamic prefetch limits support pagination through all results
 
 ## 🚦 Next Steps
 

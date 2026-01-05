@@ -156,33 +156,41 @@ const hasRiskLevels = computed(() => {
 })
 
 const getPIIIcon = (type) => {
+  // Only documented PII types from PII_DETECTION.md
   const icons = {
     credit_card: '💳',
+    credit_card_last4: '💳',
     email: '📧',
-    phone: '📱',
+    phone: '📞',
+    address: '📍',
     ssn: '🆔',
-    address: '🏠',
-    bank_account: '🏦',
     name: '👤',
-    dob: '🎂',
-    medical: '🏥',
-    ip_address: '🌐'
+    bank_account: '🏦',
+    passport: '🛂',
+    driver_license: '🚗',
+    date_of_birth: '📅',
+    ip_address: '🌐',
+    medical: '🏥'
   }
   return icons[type] || '🔒'
 }
 
 const formatPIILabel = (type) => {
+  // Only documented PII types from PII_DETECTION.md
   const labels = {
     credit_card: 'Credit Card',
+    credit_card_last4: 'Credit Card Last 4',
     email: 'Email',
     phone: 'Phone',
-    ssn: 'SSN/National ID',
     address: 'Address',
+    ssn: 'SSN',
+    name: 'Name',
     bank_account: 'Bank Account',
-    name: 'Names',
-    dob: 'Date of Birth',
-    medical: 'Medical Info',
-    ip_address: 'IP Address'
+    passport: 'Passport',
+    driver_license: 'Driver License',
+    date_of_birth: 'Date of Birth',
+    ip_address: 'IP Address',
+    medical: 'Medical Info'
   }
   return labels[type] || type
 }

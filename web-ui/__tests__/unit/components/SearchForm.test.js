@@ -1,3 +1,4 @@
+import api from '@/api';
 import SearchForm from '@/components/SearchForm.vue';
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -97,6 +98,40 @@ describe('SearchForm.vue', () => {
       const fileInput = wrapper.find('.file-input');
       expect(fileInput.exists()).toBe(true);
       expect(fileInput.attributes('type')).toBe('file');
+    });
+
+    it('includes image types in accept list when vision enabled', async () => {
+      // Mock /api/config
+      api.get.mockResolvedValueOnce({
+        data: {
+          visionEnabled: true,
+          supportedImageTypes: ['.png', '.jpg']
+        }
+      });
+
+      // Remount to trigger onMounted fetchConfig
+      wrapper.unmount();
+      wrapper = mount(SearchForm, {
+        props: {
+          loading: false,
+          stats: {
+            categories: ['hotel'],
+            locations: ['Paris']
+          }
+        }
+      });
+
+      // Switch to by-document
+      const select = wrapper.find('.select');
+      await select.setValue('by-document');
+
+      // Wait for async onMounted
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const fileInput = wrapper.find('.file-input');
+      expect(fileInput.attributes('accept')).toContain('.png');
+      expect(fileInput.attributes('accept')).toContain('.jpg');
     });
   });
 

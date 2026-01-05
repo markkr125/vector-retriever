@@ -9,7 +9,7 @@ async function countFilteredDocuments(qdrantClient, collectionName, filters) {
     // Note: Qdrant count can be slow with complex filters
     const countResult = await qdrantClient.count(collectionName, {
       filter: filters,
-      exact: false // Use approximate count for speed
+      exact: true // Use exact count for accurate pagination
     });
 
     return countResult.count;

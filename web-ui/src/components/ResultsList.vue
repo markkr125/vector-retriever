@@ -64,7 +64,7 @@
         <div class="results-meta">
           <span class="badge badge-primary">{{ searchTypeLabel }}</span>
           <span class="results-count">{{ displayResultsCount }} results out of {{ totalResults }}</span>
-          <span v-if="searchType !== 'browse' && searchType !== 'bookmarks'" class="query-text">"{{ query }}"</span>
+          <span v-if="searchType !== 'browse' && searchType !== 'bookmarks' && query && query.trim()" class="query-text">"{{ query }}"</span>
           <button 
             v-if="searchType === 'recommendation'"
             @click="emit('clear-similar')"
@@ -254,7 +254,7 @@
     <!-- Results -->
     <transition-group name="slide-up" tag="div" class="results-grid">
       <div 
-        v-for="(result, index) in props.results" 
+        v-for="(result, index) in resultsWithFormattedPII" 
         :key="result.id"
         :id="`result-${result.id}`"
         :data-doc-id="result.id"
@@ -297,7 +297,7 @@
                 :title="`Click to see ${result.payload.pii_details?.length || 0} sensitive data points`"
               >
                 <span class="pii-icon">⚠️</span>
-                <span class="pii-text">{{ formatPIITypes(result.payload.pii_types) }}</span>
+                <span class="pii-text">{{ result._formattedPIITypes }}</span>
                 <span class="pii-count">{{ result.payload.pii_details?.length || 0 }}</span>
               </button>
 
@@ -348,17 +348,24 @@
             <!-- Document Type Badge -->
             <span 
               v-if="result.payload.is_unstructured" 
-              class="badge badge-secondary"
+              class="metadata-badge unstructured"
               title="Plain text document without structured metadata"
             >
               📄 Unstructured
             </span>
             <span 
               v-if="result.payload.has_structured_metadata" 
-              class="badge badge-primary"
+              class="metadata-badge structured"
               title="Document with rich metadata"
             >
               📊 Structured
+            </span>
+            <span 
+              v-if="result.payload.document_type === 'image' || (result.payload.file_type && result.payload.file_type.startsWith('image'))" 
+              class="badge badge-info"
+              title="Image document processed with vision model"
+            >
+              📷 Image
             </span>
 
             <!-- Tags -->
@@ -419,13 +426,73 @@
         <!-- Full Content (when expanded) -->
         <transition name="fade">
           <div v-if="expandedIds.has(result.id)" class="full-content">
-            <h4>Full Content</h4>
-            <div class="content-markdown" v-html="renderMarkdown(result.payload.content)"></div>
-            
-            <!-- All Metadata -->
-            <div class="all-metadata">
-              <h4>All Metadata</h4>
-              <pre class="metadata-json">{{ JSON.stringify(result.payload, null, 2) }}</pre>
+            <!-- Content Tabs -->
+            <div class="content-tabs">
+              <button 
+                @click="setActiveTab(result.id, 'content')"
+                :class="['tab-btn', { active: getActiveTab(result.id) === 'content' }]"
+              >
+                📄 Full Content
+              </button>
+              <button 
+                @click="setActiveTab(result.id, 'overview')"
+                :class="['tab-btn', { active: getActiveTab(result.id) === 'overview' }]"
+              >
+                📝 Overview
+              </button>
+            </div>
+
+            <!-- Overview Tab -->
+            <div v-if="getActiveTab(result.id) === 'overview'" class="tab-content">
+              <div class="overview-header">
+                <h4>Document Overview</h4>
+                <button 
+                  @click="generateDescription(result.id)"
+                  class="btn btn-refresh"
+                  :disabled="generatingDescription.has(result.id) || (result.payload.document_type === 'image' && !result.payload.image_data)"
+                  :title="getRefreshButtonTitle(result)"
+                >
+                  <span v-if="generatingDescription.has(result.id)">⏳ Generating...</span>
+                  <span v-else>🔄 {{ result.payload.description ? 'Refresh' : 'Generate' }}</span>
+                </button>
+              </div>
+
+              <!-- Detected Language -->
+              <div v-if="result.payload.detected_language" class="metadata-info language-badge">
+                <span class="badge">🌐 {{ result.payload.detected_language }}</span>
+              </div>
+
+              <!-- Image without source data warning -->
+              <div v-if="result.payload.document_type === 'image' && !result.payload.image_data && result.payload.description" class="info-message">
+                ℹ️ This description was generated during upload. Refresh is unavailable because the original image was not stored.
+              </div>
+
+              <div v-if="result.payload.description" class="description-content" v-html="renderMarkdown(result.payload.description)"></div>
+              <div v-else-if="generatingDescription.has(result.id)" class="description-loading">
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line short"></div>
+              </div>
+              <div v-else class="no-description">
+                <p>No description available. Click "Generate" to create one.</p>
+              </div>
+              <div v-if="descriptionError.has(result.id)" class="error-message">
+                ❌ {{ descriptionError.get(result.id) }}
+              </div>
+            </div>
+
+            <!-- Full Content Tab -->
+            <div v-if="getActiveTab(result.id) === 'content'" class="tab-content">
+              <h4>Full Content</h4>
+              <div class="content-markdown" v-html="renderMarkdown(result.payload.content)"></div>
+              
+              <!-- All Metadata -->
+              <div class="all-metadata">
+                <h4>All Metadata</h4>
+                <pre class="metadata-json">{{ JSON.stringify(result.payload, null, 2) }}</pre>
+              </div>
             </div>
           </div>
         </transition>
@@ -528,6 +595,59 @@ const emit = defineEmits(['page-change', 'find-similar', 'clear-similar', 'clear
 
 const expandedIds = ref(new Set())
 const scanning = ref({})
+
+// Tab state for each document (overview or content)
+const documentTabs = ref(new Map())
+const generatingDescription = ref(new Set())
+const descriptionError = ref(new Map())
+
+// Get active tab for a document (default: content)
+const getActiveTab = (docId) => {
+  return documentTabs.value.get(docId) || 'content'
+}
+
+// Set active tab for a document
+const setActiveTab = (docId, tab) => {
+  documentTabs.value.set(docId, tab)
+}
+
+// Get refresh button title based on document type and data availability
+const getRefreshButtonTitle = (result) => {
+  if (result.payload.document_type === 'image' && !result.payload.image_data) {
+    return 'Cannot refresh - original image not stored'
+  }
+  return result.payload.description ? 'Regenerate description' : 'Generate description'
+}
+
+// Generate description for a document
+const generateDescription = async (docId) => {
+  generatingDescription.value.add(docId)
+  descriptionError.value.delete(docId)
+  
+  try {
+    const response = await api.post(`/documents/${docId}/generate-description`, {}, {
+      params: { collection: props.currentCollectionId }
+    })
+    
+    if (response.data.success) {
+      // Update the result in place
+      const result = props.results.find(r => r.id === docId)
+      if (result) {
+        result.payload.description = response.data.description
+        // Also update detected language if provided
+        if (response.data.detected_language) {
+          result.payload.detected_language = response.data.detected_language
+        }
+      }
+      console.log('Description generated successfully')
+    }
+  } catch (error) {
+    console.error('Failed to generate description:', error)
+    descriptionError.value.set(docId, error.response?.data?.error || 'Failed to generate description')
+  } finally {
+    generatingDescription.value.delete(docId)
+  }
+}
 
 // Filename filter state
 const browseFilenameFilter = ref('')
@@ -735,19 +855,56 @@ const toggleExpand = (id) => {
     expandedIds.value.add(id)
   }
 }
+
+// Computed property to ensure proper reactivity for PII type formatting
+const resultsWithFormattedPII = computed(() => {
+  return props.results.map(result => {
+    const piiTypes = result.payload?.pii_types
+    let formattedPIITypes = ''
+    
+    if (piiTypes && Array.isArray(piiTypes) && piiTypes.length > 0) {
+      const icons = {
+        'credit_card': '💳',
+        'credit_card_last4': '💳',
+        'email': '📧',
+        'phone': '📞',
+        'address': '📍',
+        'ssn': '🆔',
+        'name': '👤',
+        'bank_account': '🏦',
+        'passport': '🛂',
+        'driver_license': '🚗',
+        'date_of_birth': '📅',
+        'ip_address': '🌐',
+        'medical': '🏥'
+      }
+      formattedPIITypes = piiTypes.map(t => icons[t] || '🔒').join(' ')
+    }
+    
+    return {
+      ...result,
+      _formattedPIITypes: formattedPIITypes
+    }
+  })
+})
+
 const formatPIITypes = (types) => {
   if (!types || types.length === 0) return ''
+  // Only documented PII types from PII_DETECTION.md
   const icons = {
-    credit_card: '💳',
-    email: '📧',
-    phone: '📱',
-    ssn: '🆔',
-    address: '🏠',
-    bank_account: '🏦',
-    name: '👤',
-    dob: '🎂',
-    medical: '🏥',
-    ip_address: '🌐'
+    'credit_card': '💳',
+    'credit_card_last4': '💳',
+    'email': '📧',
+    'phone': '📞',
+    'address': '📍',
+    'ssn': '🆔',
+    'name': '👤',
+    'bank_account': '🏦',
+    'passport': '🛂',
+    'driver_license': '🚗',
+    'date_of_birth': '📅',
+    'ip_address': '🌐',
+    'medical': '🏥'
   }
   return types.map(t => icons[t] || '🔒').join(' ')
 }
@@ -861,6 +1018,7 @@ const refreshClusterView = async () => {
 
 const hideClusterView = () => {
   showClusterView.value = false
+  clearClusterSelection()
 }
 
 const handleClusterPointClick = (point) => {
@@ -942,6 +1100,8 @@ const scrollToResult = (docId) => {
 
 const clearClusterSelection = () => {
   clusterSelectedPoints.value = []
+  // Clear the ID filter
+  emit('filter-by-ids', [])
   // Clear the visual selection in the plot
   if (scatterPlotRef.value) {
     scatterPlotRef.value.clearSelection()
@@ -1927,6 +2087,208 @@ onMounted(() => {
   border-top: 1px solid var(--border-color);
 }
 
+/* Content Tabs */
+.content-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.tab-btn {
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  margin-bottom: -2px;
+}
+
+.tab-btn:hover:not(.active) {
+  color: var(--text-primary);
+  background: rgba(79, 70, 229, 0.05);
+}
+
+.tab-btn.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+  font-weight: 600;
+}
+
+.tab-content {
+  padding: 1rem 0;
+}
+
+/* Overview Tab Styles */
+.overview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.overview-header h4 {
+  margin: 0;
+}
+
+.btn-refresh {
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+}
+
+.btn-refresh:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5568d3, #6a4291);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  color: white;
+}
+
+.btn-refresh:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background: linear-gradient(135deg, #9ca3af, #6b7280);
+}
+
+.description-loading {
+  background: var(--background);
+  padding: 1.25rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.skeleton-line {
+  height: 16px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s ease-in-out infinite;
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
+}
+
+.skeleton-line.short {
+  width: 70%;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.description-content {
+  background: var(--background);
+  padding: 1.25rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.description-content p {
+  color: var(--text-primary);
+  line-height: 1.8;
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+}
+
+.description-content p:last-child {
+  margin-bottom: 0;
+}
+
+.description-content strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.description-content ul,
+.description-content ol {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+  color: var(--text-primary);
+}
+
+.description-content li {
+  margin: 0.25rem 0;
+  line-height: 1.6;
+}
+
+.no-description {
+  background: var(--background);
+  padding: 1.25rem;
+  border-radius: 8px;
+  border: 2px dashed var(--border-color);
+  text-align: center;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.metadata-info {
+  background: var(--background);
+  padding: 0.75rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-top: 1rem;
+}
+
+.metadata-info.language-badge {
+  background: transparent;
+  padding: 0;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.metadata-info.language-badge .badge {
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.metadata-info strong {
+  color: var(--text-primary);
+}
+
+.info-message {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid #3b82f6;
+  border-radius: 6px;
+  color: #3b82f6;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.error-message {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #ef4444;
+  border-radius: 6px;
+  color: #ef4444;
+  font-size: 0.9rem;
+}
+
+/* Full Content Tab */
 .full-content h4 {
   font-size: 1.1rem;
   font-weight: 600;
@@ -2133,4 +2495,54 @@ onMounted(() => {
 .page-number-btn:disabled {
   cursor: default;
 }
+
+/* Badge Styles */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge-primary {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.badge-secondary {
+  background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+  color: white;
+}
+
+.badge-info {
+  background: linear-gradient(135deg, #06b6d4, #0891b2);
+  color: white;
+}
+
+.metadata-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.metadata-badge.structured {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+}
+
+.metadata-badge.unstructured {
+  background: #e0f2f1;
+  color: #00695c;
+  border: 1px solid #80cbc4;
+}
+
 </style>

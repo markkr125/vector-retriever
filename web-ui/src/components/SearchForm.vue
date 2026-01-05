@@ -22,7 +22,7 @@
           type="file"
           ref="fileInput"
           @change="handleFileSelect"
-          accept=".txt,.md,.pdf,.docx"
+          :accept="acceptFileTypes"
           class="file-input"
           id="search-file-input"
         >
@@ -30,7 +30,7 @@
           <span class="upload-icon">📄</span>
           <span v-if="!selectedFile && !restoredFileName" class="upload-text">Choose file to find similar documents</span>
           <span v-else class="upload-text selected">{{ selectedFile?.name || restoredFileName }}</span>
-          <span class="upload-hint">Supports: TXT, MD, PDF, DOCX</span>
+          <span class="upload-hint">{{ byDocumentHint }}</span>
         </label>
       </div>
     </div>
@@ -286,6 +286,38 @@ const filters = ref({
 // Available options from stats
 const availableCategories = computed(() => props.stats?.categories || [])
 const availableLocations = computed(() => props.stats?.locations || [])
+
+// By-document upload config (vision-enabled images)
+const visionEnabled = ref(false)
+const supportedImageTypes = ref([])
+const acceptFileTypes = ref('.txt,.md,.pdf,.docx')
+
+const byDocumentHint = computed(() => {
+  return visionEnabled.value && supportedImageTypes.value.length > 0
+    ? 'Supports: TXT, MD, PDF, DOCX, Images'
+    : 'Supports: TXT, MD, PDF, DOCX'
+})
+
+const fetchConfig = async () => {
+  try {
+    const response = await api.get('/config')
+    const data = response?.data && typeof response.data === 'object' ? response.data : {}
+
+    visionEnabled.value = Boolean(data.visionEnabled)
+    supportedImageTypes.value = Array.isArray(data.supportedImageTypes) ? data.supportedImageTypes : []
+
+    let types = '.txt,.md,.pdf,.docx'
+    if (visionEnabled.value && supportedImageTypes.value.length > 0) {
+      types += ',' + supportedImageTypes.value.join(',')
+    }
+    acceptFileTypes.value = types
+  } catch {
+    // Keep defaults on failure
+    visionEnabled.value = false
+    supportedImageTypes.value = []
+    acceptFileTypes.value = '.txt,.md,.pdf,.docx'
+  }
+}
 
 // Validation
 const canSubmit = computed(() => {
@@ -618,7 +650,8 @@ const loadFromURL = () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await fetchConfig()
   loadFromURL()
 })
 

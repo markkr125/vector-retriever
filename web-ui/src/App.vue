@@ -682,16 +682,53 @@ const buildFiltersWithOr = () => {
   
   // Category filters (OR within category)
   if (filtersByType.category.length > 0) {
-    if (filtersByType.category.length === 1) {
+    // Special handling for "unstructured" category
+    const hasUnstructured = filtersByType.category.includes('unstructured')
+    const regularCategories = filtersByType.category.filter(c => c !== 'unstructured')
+    
+    if (hasUnstructured && regularCategories.length > 0) {
+      // Both unstructured and regular categories selected - use should (OR logic)
+      const should = []
+      
+      // Add regular categories
+      if (regularCategories.length === 1) {
+        should.push({
+          key: 'category',
+          match: { value: regularCategories[0] }
+        })
+      } else {
+        should.push({
+          key: 'category',
+          match: { any: regularCategories }
+        })
+      }
+      
+      // Add unstructured check
+      should.push({
+        key: 'is_unstructured',
+        match: { value: true }
+      })
+      
+      must.push({ should })
+    } else if (hasUnstructured) {
+      // Only unstructured selected
       must.push({
-        key: 'category',
-        match: { value: filtersByType.category[0] }
+        key: 'is_unstructured',
+        match: { value: true }
       })
     } else {
-      must.push({
-        key: 'category',
-        match: { any: filtersByType.category }
-      })
+      // Only regular categories
+      if (regularCategories.length === 1) {
+        must.push({
+          key: 'category',
+          match: { value: regularCategories[0] }
+        })
+      } else {
+        must.push({
+          key: 'category',
+          match: { any: regularCategories }
+        })
+      }
     }
   }
   
@@ -768,8 +805,8 @@ const handleSearch = async (searchParams) => {
     url.searchParams.delete('similarTo')
   }
   
-  // Only update currentQuery if searchParams has a non-empty query
-  if (searchParams.query) {
+  // Only update currentQuery if searchParams has a non-empty query (not facet-only filter search)
+  if (searchParams.query && searchParams.query.trim()) {
     currentQuery.value = searchParams.query
     // Store search params if it's a real search query (not empty)
     lastSearchParams.value = { ...searchParams }
@@ -1558,14 +1595,23 @@ const handleFilterPIIAny = async () => {
 
 // Handle PII filter - specific type
 const handleFilterPIIType = async (piiType) => {
+  console.log('handleFilterPIIType called with:', piiType)
+  console.log('Before toggle - activeFilters:', JSON.parse(JSON.stringify(activeFilters.value)))
+  
   activeFilters.value = activeFilters.value.filter(f => f.type !== 'pii_any')
   
   const existingIndex = activeFilters.value.findIndex(f => f.type === 'pii_type' && f.value === piiType)
+  console.log('existingIndex:', existingIndex)
+  
   if (existingIndex >= 0) {
+    console.log('Removing filter (toggle off)')
     activeFilters.value.splice(existingIndex, 1)
   } else {
+    console.log('Adding filter (toggle on)')
     activeFilters.value.push({ type: 'pii_type', value: piiType })
   }
+  
+  console.log('After toggle - activeFilters:', JSON.parse(JSON.stringify(activeFilters.value)))
   
   // Update URL
   const url = new URL(window.location)
@@ -1582,6 +1628,8 @@ const handleFilterPIIType = async (piiType) => {
       match: f.type === 'tag' || f.type === 'pii_type' ? { any: [f.value] } : { value: f.value }
     }))
   }
+  
+  console.log('PII Type filter - built filters:', JSON.stringify(filters, null, 2))
   
   await performFacetSearch(filters)
 }
@@ -1739,10 +1787,21 @@ const performSearch = async () => {
   } else if (activeFilters.value.length > 0) {
     // If we have active filters, refresh the filtered search
     const filters = {
-      must: activeFilters.value.map(f => ({
-        key: f.type === 'tag' ? 'tags' : f.type,
-        match: f.type === 'tag' ? { any: [f.value] } : { value: f.value }
-      }))
+      must: activeFilters.value.map(f => {
+        if (f.type === 'tag') {
+          return { key: 'tags', match: { any: [f.value] } }
+        } else if (f.type === 'pii_type') {
+          return { key: 'pii_types', match: { any: [f.value] } }
+        } else if (f.type === 'pii_risk') {
+          if (f.value === 'none') {
+            return { key: 'pii_detected', match: { value: false } }
+          } else {
+            return { key: 'pii_risk_level', match: { value: f.value } }
+          }
+        } else {
+          return { key: f.type, match: { value: f.value } }
+        }
+      })
     }
     await performFacetSearch(filters)
   }
@@ -1764,7 +1823,7 @@ const performFacetSearch = async (filters) => {
     searchType.value = 'facet'
     const searchParams = {
       searchType: 'semantic',
-      query: '',
+      query: ' ',  // Single space instead of empty - allows semantic endpoint to handle filter-only search
       limit: searchFormRef.value?.limit || 10,
       page: 1,
       filters

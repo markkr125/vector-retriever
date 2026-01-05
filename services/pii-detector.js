@@ -38,10 +38,10 @@ class PIIDetector {
    * Calculate risk level based on PII types found
    */
   calculateRiskLevel(piiTypes) {
-    const criticalTypes = ['credit_card', 'ssn', 'bank_account', 'medical'];
-    const highTypes = ['dob', 'address'];
-    const mediumTypes = ['phone', 'email'];
-    const lowTypes = ['credit_card_last4', 'name'];
+    const criticalTypes = ['credit_card', 'ssn', 'bank_account', 'passport', 'medical'];
+    const highTypes = ['date_of_birth', 'address', 'driver_license'];
+    const mediumTypes = ['phone', 'email', 'ip_address'];
+    const lowTypes = ['name', 'credit_card_last4'];
     
     const hasCritical = piiTypes.some(t => criticalTypes.includes(t));
     const hasHigh = piiTypes.some(t => highTypes.includes(t));
@@ -271,15 +271,15 @@ class RegexPIIDetector extends PIIDetector {
     const dobs = content.match(dobPattern) || [];
     dobs.forEach((dob, idx) => {
       result.piiDetails.push({
-        type: 'dob',
+        type: 'date_of_birth',
         value: dob,
         confidence: 0.8,
         location: this.findLocation(content, dob),
         context: this.extractContext(content, dob),
         detectedBy: 'regex'
       });
-      if (!result.piiTypes.includes('dob')) {
-        result.piiTypes.push('dob');
+      if (!result.piiTypes.includes('date_of_birth')) {
+        result.piiTypes.push('date_of_birth');
       }
     });
 

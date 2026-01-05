@@ -281,8 +281,12 @@ function createBrowseRoutes({
         scrollResult.points.forEach(point => {
           totalPoints++;
 
+          // Count categories (including "unstructured" for is_unstructured docs)
           if (point.payload.category) {
             categoryCount[point.payload.category] = (categoryCount[point.payload.category] || 0) + 1;
+          } else if (point.payload.is_unstructured === true) {
+            // Documents without category but marked as unstructured get "unstructured" category
+            categoryCount['unstructured'] = (categoryCount['unstructured'] || 0) + 1;
           }
 
           if (point.payload.location) {
@@ -330,7 +334,25 @@ function createBrowseRoutes({
         .sort((a, b) => b.count - a.count)
         .slice(0, 50);
 
+      // Filter PII types to only include documented types from PII_DETECTION.md
+      const documentedPIITypes = [
+        'credit_card',
+        'credit_card_last4',
+        'email', 
+        'phone',
+        'address',
+        'name',
+        'bank_account',
+        'ssn',
+        'passport',
+        'driver_license',
+        'date_of_birth',
+        'ip_address',
+        'medical'
+      ];
+      
       const piiTypes = Object.entries(piiTypeCount)
+        .filter(([name]) => documentedPIITypes.includes(name))
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count);
 

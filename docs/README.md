@@ -25,6 +25,21 @@ Welcome to the Vector Retriever documentation! This folder contains comprehensiv
 
 ---
 
+### [Hybrid Search Implementation](HYBRID_SEARCH_IMPLEMENTATION.md)
+**Detailed technical guide to weighted hybrid search**
+- Architecture and vector types (dense + sparse)
+- Query API flow with formula-based fusion
+- Weight control and score normalization
+- Deep pagination support
+- UI integration (slider, score display)
+- Performance characteristics
+- Debugging tips and common issues
+- Comparison: RRF vs Weighted vs DBSF
+
+**Best for:** Understanding how hybrid search works and troubleshooting search issues.
+
+---
+
 ### [Quick Reference](QUICK_REFERENCE.md)
 **Fast command reference and feature guide**
 - Working features checklist

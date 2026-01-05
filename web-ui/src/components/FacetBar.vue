@@ -372,17 +372,21 @@ const filteredPIITypes = computed(() => {
 })
 
 const formatPIITypeName = (type) => {
+  // Only documented PII types from PII_DETECTION.md
   const icons = {
-    'name': '👤',
+    'credit_card': '💳',
+    'credit_card_last4': '💳',
     'email': '📧',
     'phone': '📞',
-    'address': '🏠',
+    'address': '📍',
     'ssn': '🆔',
-    'credit_card': '💳',
+    'name': '👤',
+    'bank_account': '🏦',
     'passport': '🛂',
     'driver_license': '🚗',
+    'date_of_birth': '📅',
     'ip_address': '🌐',
-    'date_of_birth': '🎂'
+    'medical': '🏥'
   }
   const icon = icons[type] || '🔒'
   const label = type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())

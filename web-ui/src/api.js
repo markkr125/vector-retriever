@@ -94,4 +94,12 @@ export async function stopUploadJob(jobId) {
   return response.data;
 }
 
+// Description generation
+export async function generateDescription(documentId, collectionId) {
+  const response = await api.post(`/documents/${documentId}/generate-description`, {}, {
+    params: { collection: collectionId }
+  });
+  return response.data;
+}
+
 export default api;

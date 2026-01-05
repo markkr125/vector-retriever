@@ -126,33 +126,41 @@ const countByType = (type) => {
 }
 
 const getPIIIcon = (type) => {
+  // Only documented PII types from PII_DETECTION.md
   const icons = {
     credit_card: '💳',
+    credit_card_last4: '💳',
     email: '📧',
-    phone: '📱',
+    phone: '📞',
+    address: '📍',
     ssn: '🆔',
-    address: '🏠',
-    bank_account: '🏦',
     name: '👤',
-    dob: '🎂',
-    medical: '🏥',
-    ip_address: '🌐'
+    bank_account: '🏦',
+    passport: '🛂',
+    driver_license: '🚗',
+    date_of_birth: '📅',
+    ip_address: '🌐',
+    medical: '🏥'
   }
   return icons[type] || '🔒'
 }
 
 const formatPIILabel = (type) => {
+  // Only documented PII types from PII_DETECTION.md
   const labels = {
     credit_card: 'Credit Card',
+    credit_card_last4: 'Credit Card Last 4',
     email: 'Email Address',
     phone: 'Phone Number',
-    ssn: 'SSN / National ID',
     address: 'Physical Address',
-    bank_account: 'Bank Account',
+    ssn: 'SSN',
     name: 'Personal Name',
-    dob: 'Date of Birth',
-    medical: 'Medical Info',
-    ip_address: 'IP Address'
+    bank_account: 'Bank Account',
+    passport: 'Passport',
+    driver_license: 'Driver License',
+    date_of_birth: 'Date of Birth',
+    ip_address: 'IP Address',
+    medical: 'Medical Info'
   }
   return labels[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 }
