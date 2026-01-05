@@ -432,6 +432,18 @@ cp .env.example .env
 
 > **💡 Auto-Categorization:** Set a model to automatically extract category, location, tags, and other metadata from uploaded documents using LLM.
 
+#### Vision & Image Processing (Optional)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VISION_MODEL_ENABLED` | `false` | Enable image upload and processing with vision models |
+| `VISION_MODEL` | `gemma3:4b` | Vision model for image analysis (must support vision/multimodal) |
+| `DESCRIPTION_MODEL` | _(uses CATEGORIZATION_MODEL)_ | Model for generating document descriptions |
+| `SUPPORTED_IMAGE_TYPES` | `.jpg,.jpeg,.png,.gif,.webp,.bmp` | Comma-separated list of supported image file extensions |
+| `AUTO_GENERATE_DESCRIPTION` | `true` | Automatically generate overview and language detection at upload time |
+
+> **💡 Vision Processing:** Enable to upload and process images (`.jpg`, `.png`, etc.). The vision model extracts descriptions, detects language, and generates searchable content. Set `AUTO_GENERATE_DESCRIPTION=false` to speed up uploads by skipping automatic description generation.
+
 #### Visualization Cache (Advanced)
 
 | Variable | Default | Description |
