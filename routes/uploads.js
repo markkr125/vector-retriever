@@ -1,4 +1,79 @@
 const express = require('express');
+const { isAbortError } = require('../services/ollama-agent');
+
+function clampInt(value, { min, max, fallback }) {
+  const parsed = parseInt(value, 10);
+  if (Number.isNaN(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function serializeUploadJob(job, reqQuery = {}) {
+  const filesTotal = Array.isArray(job.files) ? job.files.length : 0;
+
+  // Default to returning a window around current progress to keep payload small.
+  const defaultOffset = Math.max(0, (job.processedFiles || 0) - 50);
+  const filesOffset = clampInt(reqQuery.filesOffset, {
+    min: 0,
+    max: filesTotal,
+    fallback: defaultOffset
+  });
+
+  const filesLimit = clampInt(reqQuery.filesLimit, {
+    min: 0,
+    max: 1000,
+    fallback: 200
+  });
+
+  const files = Array.isArray(job.files)
+    ? job.files.slice(filesOffset, filesOffset + filesLimit)
+    : [];
+
+  return {
+    id: job.id,
+    status: job.status,
+    totalFiles: job.totalFiles,
+    processedFiles: job.processedFiles,
+    successfulFiles: job.successfulFiles,
+    failedFiles: job.failedFiles,
+    currentFile: job.currentFile,
+    currentStage: job.currentStage,
+    startTime: job.startTime,
+    endTime: job.endTime,
+    source: job.source,
+    provider: job.provider,
+
+    filesTotal,
+    filesOffset,
+    filesLimit,
+    files
+  };
+}
+
+function serializeUploadJobFiles(job, reqQuery = {}) {
+  const filesTotal = Array.isArray(job.files) ? job.files.length : 0;
+  const filesOffset = clampInt(reqQuery.offset ?? reqQuery.filesOffset, {
+    min: 0,
+    max: filesTotal,
+    fallback: 0
+  });
+  const filesLimit = clampInt(reqQuery.limit ?? reqQuery.filesLimit, {
+    min: 0,
+    max: 1000,
+    fallback: 200
+  });
+
+  const files = Array.isArray(job.files)
+    ? job.files.slice(filesOffset, filesOffset + filesLimit)
+    : [];
+
+  return {
+    id: job.id,
+    filesTotal,
+    offset: filesOffset,
+    limit: filesLimit,
+    files
+  };
+}
 
 function createUploadsRoutes({
   upload,
@@ -53,12 +128,35 @@ function createUploadsRoutes({
           job.currentFile = fileInfo.name;
 
           try {
-            const result = await documentService.processSingleFile(file, req.qdrantCollection, autoCategorize);
+            const result = await documentService.processSingleFile(
+              file,
+              req.qdrantCollection,
+              autoCategorize,
+              {
+                signal: job.abortController?.signal,
+                onStage: (stage) => {
+                  job.currentStage = stage;
+                }
+              }
+            );
 
             fileInfo.status = 'success';
             fileInfo.id = result.id;
             job.successfulFiles++;
           } catch (error) {
+            const aborted = isAbortError(error) || job.abortController?.signal?.aborted;
+            if (aborted && job.status === 'stopped') {
+              fileInfo.status = 'error';
+              fileInfo.error = 'Cancelled by user';
+              job.failedFiles++;
+              job.errors.push({
+                filename: fileInfo.name,
+                error: 'Cancelled by user'
+              });
+              console.log(`Job ${job.id} cancelled during file: ${fileInfo.name}`);
+              break;
+            }
+
             console.error(`Error processing file ${fileInfo.name}:`, error);
 
             fileInfo.status = 'error';
@@ -71,6 +169,7 @@ function createUploadsRoutes({
           } finally {
             job.processedFiles++;
             job.currentFile = null;
+            job.currentStage = null;
           }
         }
 
@@ -79,6 +178,7 @@ function createUploadsRoutes({
           job.status = 'completed';
         }
         job.endTime = Date.now();
+        job.currentStage = null;
 
         // Update collection document count
         if (job.successfulFiles > 0) {
@@ -101,7 +201,7 @@ function createUploadsRoutes({
   router.get('/upload-jobs/active', (req, res) => {
     for (const job of uploadJobs.values()) {
       if (job.status === 'processing') {
-        return res.json(job);
+        return res.json(serializeUploadJob(job, req.query));
       }
     }
 
@@ -116,7 +216,19 @@ function createUploadsRoutes({
       return res.status(404).json({ error: 'Job not found' });
     }
 
-    res.json(job);
+    res.json(serializeUploadJob(job, req.query));
+  });
+
+  // Paged file list for virtual scrolling
+  router.get('/upload-jobs/:jobId/files', (req, res) => {
+    const { jobId } = req.params;
+    const job = uploadJobs.get(jobId);
+
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    res.json(serializeUploadJobFiles(job, req.query));
   });
 
   router.post('/upload-jobs/:jobId/stop', (req, res) => {
@@ -132,9 +244,14 @@ function createUploadsRoutes({
     }
 
     job.status = 'stopped';
+    try {
+      job.abortController?.abort();
+    } catch {
+      // ignore
+    }
     console.log(`Job ${jobId} marked for stopping`);
 
-    res.json({ success: true, message: 'Job will stop after current file completes' });
+    res.json({ success: true, message: job.abortController ? 'Job cancelled' : 'Job will stop after current file completes' });
   });
 
   return router;

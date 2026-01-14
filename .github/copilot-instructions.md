@@ -7,7 +7,7 @@
 - [Architecture Overview](#architecture-overview)
 - [Critical Developer Workflows](#critical-developer-workflows)
 - [Project-Specific Conventions](#project-specific-conventions)
-- [Express API Endpoints (29 routes)](#express-api-endpoints-29-routes)
+- [Express API Endpoints (30 routes)](#express-api-endpoints-30-routes)
 - [Vue.js UI Architecture](#vuejs-ui-architecture)
 - [Integration Points](#integration-points)
 - [Common Debugging Patterns](#common-debugging-patterns)
@@ -387,6 +387,7 @@ uploadJobs.set(jobId, {
   successfulFiles: 2,
   failedFiles: 1,
   currentFile: 'document.pdf',  // Currently processing file
+  currentStage: 'Embedding…',   // Current step for active file (UI hint)
   files: [  // File-level tracking with individual status
     { name: 'doc1.pdf', status: 'success', id: 12345 },
     { name: 'doc2.pdf', status: 'processing' },
@@ -409,6 +410,22 @@ uploadJobs.set(jobId, {
 - **Polling safeguards**: Uses watchers for `props.show` and `props.jobId` to prevent duplicate intervals
 - `startPolling()` calls `stopPolling()` first to ensure only one interval runs
 
+**Large Job Scaling (50K+ files):**
+- Status polling should be lightweight: `GET /api/upload-jobs/:jobId?filesLimit=0` (avoid returning the file list every second)
+- File list paging: `GET /api/upload-jobs/:jobId/files?offset=0&limit=200` returns `{ filesTotal, offset, limit, files }`
+- UI uses virtual rendering (fixed row height) and fetches pages on scroll; rows are cached by index to avoid re-requesting
+- Scroll fetching is debounced (~150ms) to avoid spamming `/files` during continuous scrolling; in-flight page fetches are abortable via `AbortController`
+
+**Cloud Import File Selection (Subfolders + Types):**
+- Cloud analysis results should include a stable per-file path (`key`/`path`) so the UI can derive folders and display breadcrumbs.
+- Cloud analysis results should include a per-file `extension` field; the file-type dropdown is derived from this.
+  - Symptom if missing: file-type dropdown shows only “All Types”.
+- `FileSelector.vue` supports real folder navigation (breadcrumbs + folder rows). For S3, pass `rootPrefix` so the breadcrumb/path display is relative to the analyzed prefix.
+
+**Stage Reporting (Current Action):**
+- `services/document-service.js` supports `options.onStage(stageLabel)` to report major steps (PII scan, categorization, embedding, saving)
+- Upload/cloud-import workers pass `onStage` to update `job.currentStage` so the UI can display a second line under “Processing: <file>”
+
 **RTL Text Support:**
 Hebrew and other right-to-left language filenames displayed correctly:
 ```css
@@ -428,10 +445,13 @@ const generateJobId = () => `job_${Date.now()}_${jobIdCounter++}`;
 Combines timestamp + auto-incrementing counter for uniqueness.
 
 **Stop Behavior:**
-- Current file completes fully (no corruption)
-- Remaining files skipped (never started)
-- Completed files remain in database
-- Job status changes to 'stopped'
+- Each upload job owns an `abortController` (AbortSignal propagated through `documentService.processSingleFile(..., { signal })`).
+- Stop requests set `job.status='stopped'` and call `abortController.abort()` to cancel in-flight Ollama/embedding requests where supported.
+- The current file may be marked as cancelled (surfaced as an error on that file), and remaining files are skipped.
+
+**Abortable Ollama Calls (Option C):**
+- Shared helper: `services/ollama-agent.js` (`runOllamaChat`) centralizes AbortSignal + JSONL stream collection.
+- Services that call `/api/chat` should use `runOllamaChat({ ..., signal })` instead of duplicating axios streaming logic.
 
 ### Pagination Pattern
 **Frontend** (`ResultsList.vue`):
@@ -637,7 +657,7 @@ Qdrant **cannot filter on missing fields**. For `must_not: [{ key: 'pii_detected
 
 See `server.js` lines 906-940 for implementation pattern.
 
-## Express API Endpoints (29 routes)
+## Express API Endpoints (30 routes)
 
 **Search endpoints:**
 - `POST /api/search/semantic` - Dense vector search only
@@ -656,6 +676,7 @@ See `server.js` lines 906-940 for implementation pattern.
 - `POST /api/documents/upload` - Multi-file upload (async jobs, returns jobId immediately)
 - `GET /api/upload-jobs/active` - Get currently active upload job ⚠️ MUST come before :jobId route
 - `GET /api/upload-jobs/:jobId` - Get upload job status by ID
+- `GET /api/upload-jobs/:jobId/files` - Paged file status slice for large jobs (use `offset` + `limit`)
 - `POST /api/upload-jobs/:jobId/stop` - Stop upload (finishes current file, skips rest)
 
 **Temp Files:**

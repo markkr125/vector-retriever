@@ -6,6 +6,7 @@
 const axios = require('axios');
 const nlp = require('compromise');
 const { phone } = require('phone');
+const { runOllamaChat, isAbortError, throwIfAborted } = require('./ollama-agent');
 
 /**
  * Standardized PII result format
@@ -351,7 +352,7 @@ class OllamaPIIDetector extends PIIDetector {
 
     try {
       // Truncate content if too long
-      const textSample = content
+      const textSample = content.substring(0, 4000);
 
       const systemPrompt = `You are a PII (Personally Identifiable Information) detection specialist.
 Your task: scan the supplied text once only and return every exact instance of sensitive personal data that meets the rules below. Do not repeat any item, combine lines, or add new formatting.
@@ -428,72 +429,47 @@ Format example:
 
 If no PII found, return exactly: []`;
 
-      const headers = {
-        'Content-Type': 'application/json'
-      };
-      if (this.authToken) {
-        headers['Authorization'] = `Bearer ${this.authToken}`;
-      }
+      throwIfAborted(options.signal);
 
-      const response = await axios.post(this.ollamaUrl, {
-        model: this.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: textSample }
-        ],
-        stream: true
-      }, { 
-        headers, 
-        timeout: 60000,
-        responseType: 'stream'
-      });
-
-      // Collect streaming response with duplicate detection
-      let responseText = '';
       const maxOccurrences = 3; // Stop if same finding appears more than 3 times
-      
-      for await (const chunk of response.data) {
-        const lines = chunk.toString().split('\n').filter(line => line.trim());
-        for (const line of lines) {
-          try {
-            const json = JSON.parse(line);
-            if (json.message?.content) {
-              responseText += json.message.content;
-              
-              // Extract complete PII findings from accumulated response
-              // Match complete objects: {"type":"...","value":"...",...}
-              const findingPattern = /\{\s*"type"\s*:\s*"([^"]+)"[^}]*"value"\s*:\s*"([^"]+)"/g;
-              const findingCounts = new Map();
-              let match;
-              
-              while ((match = findingPattern.exec(responseText)) !== null) {
-                const key = `${match[1]}:${match[2]}`;
-                findingCounts.set(key, (findingCounts.get(key) || 0) + 1);
-              }
-              
-              // Check if any finding exceeds max occurrences
-              for (const [key, count] of findingCounts.entries()) {
-                if (count > maxOccurrences) {
-                  console.warn(`Ollama detection: Finding repeated ${count} times (${key}), stopping stream`);
-                  // Force stop the stream
-                  if (response.data.destroy) {
-                    response.data.destroy();
-                  }
-                  break;
-                }
-              }
-            }
-            // Check for done signal
-            if (json.done === true) {
-              break;
-            }
-          } catch (e) {
-            // Skip invalid JSON chunks
+      const findingPattern = /\{\s*"type"\s*:\s*"([^"]+)"[^}]*"value"\s*:\s*"([^"]+)"/g;
+
+      const { text: responseText } = await runOllamaChat({
+        axios,
+        ollamaUrl: this.ollamaUrl,
+        authToken: this.authToken,
+        body: {
+          model: this.model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: textSample }
+          ],
+          stream: true
+        },
+        timeoutMs: 60000,
+        signal: options.signal,
+        maxStreamTimeMs: 60000,
+        shouldStop: (text) => {
+          const findingCounts = new Map();
+          let match;
+
+          findingPattern.lastIndex = 0;
+
+          while ((match = findingPattern.exec(text)) !== null) {
+            const key = `${match[1]}:${match[2]}`;
+            findingCounts.set(key, (findingCounts.get(key) || 0) + 1);
           }
+
+          for (const [key, count] of findingCounts.entries()) {
+            if (count > maxOccurrences) {
+              console.warn(`Ollama detection: Finding repeated ${count} times (${key}), stopping stream`);
+              return true;
+            }
+          }
+
+          return false;
         }
-      }
-      
-      responseText = responseText.trim();
+      });
       
       // Debug: Print full Ollama detection response
       console.log('\n=== OLLAMA DETECTION RESPONSE ===');
@@ -709,7 +685,7 @@ If no PII found, return exactly: []`;
       // VALIDATION AGENT: Second pass to verify findings make sense (unless disabled)
       if (result.piiDetails.length > 0 && !options.skipValidation) {
         console.log(`[Ollama] Validating ${result.piiDetails.length} findings with validation agent...`);
-        await this.validateFindings(result, content);
+        await this.validateFindings(result, content, options);
         // Note: validateFindings updates piiTypes, hasPII, and riskLevel internally
       } else {
         result.piiTypes = [...new Set(result.piiDetails.map(d => d.type))];
@@ -722,8 +698,12 @@ If no PII found, return exactly: []`;
       return result;
 
     } catch (error) {
+      if (isAbortError(error) || options.signal?.aborted) {
+        throw error;
+      }
+
       console.error('Ollama PII detection error:', error.message);
-      // Return empty result on error
+      // Return empty result on non-abort error
       result.processingTimeMs = Date.now() - startTime;
       return result;
     }
@@ -740,7 +720,7 @@ If no PII found, return exactly: []`;
   /**
    * Second agent to validate PII findings
    */
-  async validateFindings(result, content) {
+  async validateFindings(result, content, options = {}) {
     try {
       const validationPrompt = `You are a PII validation expert. Review the following detected PII findings and determine if they are CORRECTLY classified.
 
@@ -785,107 +765,45 @@ Respond with ONLY a JSON array in this format:
   }
 ]`;
 
-      const headers = {
-        'Content-Type': 'application/json'
-      };
-      if (this.authToken) {
-        headers['Authorization'] = `Bearer ${this.authToken}`;
-      }
+      throwIfAborted(options.signal);
 
-      const response = await axios.post(this.ollamaUrl, {
-        model: this.model,
-        messages: [
-          { role: 'user', content: validationPrompt }
-        ],
-        stream: true
-      }, {
-        headers,
-        timeout: 30000, // 30 second timeout
-        responseType: 'stream'
-      });
-
-      // Collect streaming response with duplicate detection
-      let responseText = '';
-      const streamStartTime = Date.now();
-      const maxStreamTime = 30000; // 30 seconds
       const maxOccurrences = 3; // Stop if same validation appears more than 3 times
-      
-      for await (const chunk of response.data) {
-        // Safety check: Time limit
-        if (Date.now() - streamStartTime > maxStreamTime) {
-          console.warn('Validation agent: Stream timeout (30s), stopping');
-          break;
-        }
-        
-        const lines = chunk.toString().split('\n').filter(line => line.trim());
-        for (const line of lines) {
-          try {
-            const json = JSON.parse(line);
-            if (json.message?.content) {
-              responseText += json.message.content;
-              
-              // Extract complete validation objects from accumulated response
-              // Match: {"index":N,"valid":true/false,...}
-              const validationPattern = /\{\s*"index"\s*:\s*(\d+)\s*,\s*"valid"\s*:\s*(true|false)/g;
-              const currentValidations = [];
-              let match;
-              
-              while ((match = validationPattern.exec(responseText)) !== null) {
-                currentValidations.push({ index: match[1], valid: match[2] });
-              }
-              
-              // Count occurrences of each validation
-              const currentCounts = new Map();
-              for (const validation of currentValidations) {
-                const key = `${validation.index}:${validation.valid}`;
-                currentCounts.set(key, (currentCounts.get(key) || 0) + 1);
-              }
-              
-              // Check if any validation exceeds max occurrences
-              let shouldStop = false;
-              for (const [key, count] of currentCounts.entries()) {
-                if (count > maxOccurrences) {
-                  console.warn(`Validation agent: Validation repeated ${count} times (${key}), stopping stream`);
-                  shouldStop = true;
-                  break;
-                }
-              }
-              
-              if (shouldStop) {
-                if (response.data.destroy) {
-                  response.data.destroy();
-                }
-                break;
-              }
-            }
-            // Check for done signal
-            if (json.done === true) {
-              break;
-            }
-          } catch (e) {
-            // Skip invalid JSON chunks
-          }
-        }
-        
-        // Break outer loop if we stopped due to duplicates
-        const validationPattern = /\{\s*"index"\s*:\s*(\d+)\s*,\s*"valid"\s*:\s*(true|false)/g;
-        const finalCounts = new Map();
-        let match;
-        while ((match = validationPattern.exec(responseText)) !== null) {
-          const key = `${match[1]}:${match[2]}`;
-          finalCounts.set(key, (finalCounts.get(key) || 0) + 1);
-        }
-        let shouldBreak = false;
-        for (const [key, count] of finalCounts.entries()) {
-          if (count > maxOccurrences) {
-            shouldBreak = true;
-            break;
-          }
-        }
-        if (shouldBreak) break;
-      }
+      const validationPattern = /\{\s*"index"\s*:\s*(\d+)\s*,\s*"valid"\s*:\s*(true|false)/g;
 
-      responseText = responseText.trim();
+      const { text: responseText } = await runOllamaChat({
+        axios,
+        ollamaUrl: this.ollamaUrl,
+        authToken: this.authToken,
+        body: {
+          model: this.model,
+          messages: [
+            { role: 'user', content: validationPrompt }
+          ],
+          stream: true
+        },
+        timeoutMs: 30000,
+        signal: options.signal,
+        maxStreamTimeMs: 30000,
+        shouldStop: (text) => {
+          const currentCounts = new Map();
+          let match;
+
+          validationPattern.lastIndex = 0;
+          while ((match = validationPattern.exec(text)) !== null) {
+            const key = `${match[1]}:${match[2]}`;
+            currentCounts.set(key, (currentCounts.get(key) || 0) + 1);
+          }
+
+          for (const [key, count] of currentCounts.entries()) {
+            if (count > maxOccurrences) {
+              console.warn(`Validation agent: Validation repeated ${count} times (${key}), stopping stream`);
+              return true;
+            }
+          }
+
+          return false;
+        }
+      });
       
       // Debug: Print full Ollama validation response
       console.log('\n=== OLLAMA VALIDATION RESPONSE ===');
@@ -929,6 +847,10 @@ Respond with ONLY a JSON array in this format:
       result.riskLevel = this.calculateRiskLevel(result.piiTypes);
       
     } catch (error) {
+      if (isAbortError(error) || options.signal?.aborted) {
+        throw error;
+      }
+
       console.error('Validation agent error (continuing with original findings):', error.message);
       // Don't fail the entire detection if validation fails
     }
@@ -1262,7 +1184,22 @@ class AdvancedPIIDetector extends PIIDetector {
  * Factory to create appropriate detector
  */
 class PIIDetectorFactory {
-  static create(method, ollamaUrl, authToken, model) {
+  static create(method, options) {
+    // Support both old signature (method, ollamaUrl, authToken, model) and new (method, options)
+    let ollamaUrl, authToken, model;
+    
+    if (typeof options === 'object' && options !== null) {
+      // New signature with options object
+      ollamaUrl = options.ollamaUrl;
+      authToken = options.authToken;
+      model = options.model;
+    } else {
+      // Old signature with individual parameters (for backwards compatibility)
+      ollamaUrl = options;
+      authToken = arguments[2];
+      model = arguments[3];
+    }
+    
     switch(method?.toLowerCase()) {
       case 'ollama':
         return new OllamaPIIDetector(ollamaUrl, authToken, model);

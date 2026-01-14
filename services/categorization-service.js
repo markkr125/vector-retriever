@@ -1,5 +1,7 @@
+const { runOllamaChat, isAbortError, throwIfAborted } = require('./ollama-agent');
+
 function createCategorizationService({ axios, ollamaUrl, authToken, categorizationModel }) {
-  async function categorizeDocument(content) {
+  async function categorizeDocument(content, options = {}) {
     if (!categorizationModel) {
       return {};
     }
@@ -32,25 +34,23 @@ Requirements:
 - Keep all keys exactly as shown above`;
 
     try {
-      const ollamaChatUrl = ollamaUrl.replace('/api/embed', '/api/chat');
+      throwIfAborted(options.signal);
 
-      const headers = {
-        'Content-Type': 'application/json'
-      };
-      if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-      }
-
-      const response = await axios.post(ollamaChatUrl, {
-        model: categorizationModel,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: textSample }
-        ],
-        stream: false
-      }, { headers });
-
-      const result = response.data.message.content.trim();
+      const { text: result } = await runOllamaChat({
+        axios,
+        ollamaUrl,
+        authToken,
+        body: {
+          model: categorizationModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: textSample }
+          ],
+          stream: false
+        },
+        timeoutMs: 120000,
+        signal: options.signal
+      });
 
       // Parse JSON response
       const jsonMatch = result.match(/\{[\s\S]*\}/);
@@ -74,6 +74,9 @@ Requirements:
       console.warn('Could not parse JSON from categorization response');
       return {};
     } catch (error) {
+      if (isAbortError(error) || options.signal?.aborted) {
+        throw error;
+      }
       console.error('Error during categorization:', error.message);
       return {};
     }

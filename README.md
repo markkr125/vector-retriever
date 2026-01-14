@@ -29,6 +29,7 @@ General purpose vector database application showcasing **Qdrant's powerful featu
 
 - **[Quick Reference](docs/QUICK_REFERENCE.md)** - Fast command reference and key features
 - **[Complete Summary](docs/SUMMARY.md)** - Comprehensive project overview
+- **[Cloud Import Guide](docs/CLOUD_IMPORT.md)** - Import from S3/Google Drive with advanced filtering
 - **[Hybrid Search Implementation](docs/HYBRID_SEARCH_IMPLEMENTATION.md)** - Technical guide to weighted fusion, score normalization, and deep pagination
 - **[Mixed Dataset Guide](docs/MIXED_DATASET.md)** - Handling structured + unstructured documents
 - **[Location Search Examples](docs/LOCATION_SEARCH_EXAMPLES.md)** - City and geo-radius queries
@@ -218,6 +219,7 @@ This will:
 
 - **Multiple Search Types**: Semantic, Hybrid, Location, Geo-radius
 - **Advanced Filtering**: Category, price range, ratings, tags, document type
+- **Cloud Import**: Direct import from AWS S3 buckets with file selection and filtering
 - **Interactive Results**: Expandable cards with full metadata
 - **Real-time Search**: Instant results as you type
 - **Beautiful UI**: Modern, responsive design
@@ -812,16 +814,17 @@ vector-retriever/
    - Show key information: summary, entities, topics, language detection
    - Display metadata extraction preview (categories, tags, dates, pii)
    - Quick decision tool: "Should I add this document?"
-
-7. **Cloud import integration**: Import from public S3/Google Drive folders
-   - **AWS S3**: Direct bucket/folder import with public URLs (no authentication required)
-   - **Google Drive**: Public folder import with shared links
-   - **Pre-import analysis**: Display folder stats (file count, total size, file types breakdown)
-   - **Flexible import options**:
+✅ **Cloud import integration**: Import from public S3/Google Drive folders - **[See Documentation](docs/CLOUD_IMPORT.md)**
+   - ✅ **AWS S3**: Direct bucket/folder import with public URLs (no authentication required)
+   - ✅ **Google Drive**: Public folder import with shared links (optional, requires API key)
+   - ✅ **Pre-import analysis**: Display folder stats (file count, total size, file types breakdown)
+   - ✅ **Flexible import options**:
      - Import all files from folder
      - Import first X files (for testing/sampling)
      - Search and select specific files with preview UI
      - Filter by file type, size, or date range
+   - ✅ **Batch processing**: Background import with progress tracking and error handling
+   - ✅ **Full pipeline integration**: All processing features work (text extraction, categorization, PII detection, embeddings)
    - **Batch processing**: Background import with progress tracking and error handling
 
 ## 📄 License

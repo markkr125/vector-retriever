@@ -2,6 +2,8 @@ const express = require('express');
 
 function createConfigHealthRoutes({
   maxFileSizeMB,
+  maxCloudImportDocs,
+  maxCloudImportSizeMB,
   categorizationEnabled,
   piiDetectionEnabled,
   piiDetectionMethod,
@@ -15,6 +17,8 @@ function createConfigHealthRoutes({
   router.get('/config', (req, res) => {
     res.json({
       maxFileSizeMB,
+      maxCloudImportDocs,
+      maxCloudImportSizeMB,
       categorizationEnabled,
       piiDetectionEnabled,
       piiDetectionMethod,

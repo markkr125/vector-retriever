@@ -1,5 +1,7 @@
+const { isAbortError } = require('./ollama-agent');
+
 function createPiiService({ enabled, detector }) {
-  async function detectPII(content) {
+  async function detectPII(content, options = {}) {
     if (!enabled || !detector) {
       return {
         hasPII: false,
@@ -13,8 +15,12 @@ function createPiiService({ enabled, detector }) {
     }
 
     try {
-      return await detector.detect(content);
+      return await detector.detect(content, options);
     } catch (error) {
+      if (isAbortError(error) || options.signal?.aborted) {
+        throw error;
+      }
+
       console.error('PII detection error:', error);
       return {
         hasPII: false,

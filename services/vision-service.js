@@ -4,6 +4,7 @@
  */
 
 const sharp = require('sharp');
+const { runOllamaChat, isAbortError, throwIfAborted } = require('./ollama-agent');
 
 function createVisionService({ axios, ollamaUrl, authToken, visionModel }) {
   /**
@@ -12,7 +13,7 @@ function createVisionService({ axios, ollamaUrl, authToken, visionModel }) {
    * @param {string} mimeType - Image MIME type (e.g., 'image/jpeg')
    * @returns {Promise<{language: string, description: string, markdownContent: string}>}
    */
-  async function processImage(imageBuffer, mimeType) {
+  async function processImage(imageBuffer, mimeType, options = {}) {
     if (!visionModel) {
       throw new Error('Vision model not configured. Set VISION_MODEL in .env');
     }
@@ -21,25 +22,21 @@ function createVisionService({ axios, ollamaUrl, authToken, visionModel }) {
     const startTime = Date.now();
 
     try {
+      throwIfAborted(options.signal);
+
       // Re-encode image using sharp to fix any format issues (like JPEG subsampling)
       // Convert to PNG which is universally supported
       console.log('Re-encoding image to ensure compatibility...');
       const normalizedBuffer = await sharp(imageBuffer)
         .png() // Convert to PNG (universally supported, no subsampling issues)
         .toBuffer();
+
+      throwIfAborted(options.signal);
       
       // Convert buffer to base64
       const base64Image = normalizedBuffer.toString('base64');
 
-      const headers = {
-        'Content-Type': 'application/json'
-      };
-      if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-      }
-
-      // Replace /api/embed with /api/chat for vision models
-      const ollamaChatUrl = ollamaUrl.replace('/api/embed', '/api/chat');
+      throwIfAborted(options.signal);
 
       const systemPrompt = `You are a document analysis assistant. Analyze this image thoroughly.
 
@@ -67,26 +64,28 @@ Include all essential information someone would need to understand what this doc
 
 Be thorough and precise. Capture every detail from the image.`;
 
-      const response = await axios.post(ollamaChatUrl, {
-        model: visionModel,
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user',
-            content: 'Please analyze this image.',
-            images: [base64Image]
-          }
-        ],
-        stream: false
-      }, {
-        headers,
-        timeout: 300000 // 5 minute timeout for vision processing
+      const { text: result } = await runOllamaChat({
+        axios,
+        ollamaUrl,
+        authToken,
+        body: {
+          model: visionModel,
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: 'Please analyze this image.',
+              images: [base64Image]
+            }
+          ],
+          stream: false
+        },
+        timeoutMs: 300000,
+        signal: options.signal
       });
-
-      const result = response.data.message.content.trim();
       const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
       // Parse structured response
@@ -100,6 +99,10 @@ Be thorough and precise. Capture every detail from the image.`;
       return parsed;
 
     } catch (error) {
+      if (isAbortError(error) || options.signal?.aborted) {
+        throw error;
+      }
+
       if (error.code === 'ECONNREFUSED') {
         console.error('❌ Ollama service is not running or not accessible at', ollamaUrl);
         throw new Error('Ollama service unavailable. Please start Ollama.');
