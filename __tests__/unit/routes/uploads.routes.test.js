@@ -2,6 +2,10 @@ const express = require('express');
 const request = require('supertest');
 const multer = require('multer');
 
+jest.mock('../../../services/cloud-import-worker', () => ({
+  processCloudImport: jest.fn(async () => {})
+}));
+
 const { createUploadsRoutes } = require('../../../routes/uploads');
 const { uploadJobs } = require('../../../state/upload-jobs');
 
@@ -163,5 +167,64 @@ describe('uploads routes (unit)', () => {
     expect(res.body.limit).toBe(5);
     expect(res.body.files).toHaveLength(5);
     expect(res.body.files[0].name).toBe('f10.txt');
+  });
+
+  test('POST /api/upload-jobs/:jobId/resume returns 404 when job missing', async () => {
+    const app = createApp();
+
+    await request(app)
+      .post('/api/upload-jobs/does-not-exist/resume')
+      .expect(404);
+  });
+
+  test('POST /api/upload-jobs/:jobId/resume returns 400 when job is not paused', async () => {
+    const app = createApp();
+    const { createJob } = require('../../../state/upload-jobs');
+    const job = createJob(1);
+    job.status = 'processing';
+
+    await request(app)
+      .post(`/api/upload-jobs/${job.id}/resume`)
+      .expect(400);
+  });
+
+  test('POST /api/upload-jobs/:jobId/resume returns 400 for non-cloud jobs', async () => {
+    const app = createApp();
+    const { createJob } = require('../../../state/upload-jobs');
+    const job = createJob(1);
+    job.status = 'stopped';
+    job.source = 'local';
+
+    const res = await request(app)
+      .post(`/api/upload-jobs/${job.id}/resume`)
+      .expect(400);
+
+    expect(res.body.error).toMatch(/only supported for cloud/i);
+  });
+
+  test('POST /api/upload-jobs/:jobId/resume resumes paused cloud import job', async () => {
+    const app = createApp();
+    const { processCloudImport } = require('../../../services/cloud-import-worker');
+
+    const { createJob } = require('../../../state/upload-jobs');
+    const job = createJob(2);
+    job.status = 'stopped';
+    job.source = 'cloud';
+    job.provider = 's3';
+    job.qdrantCollection = 'test-collection';
+    job.cloudImportQueue = [{ name: 'a.txt', size: 1 }, { name: 'b.txt', size: 1 }];
+    job.cloudImportCursor = 0;
+    job.files = [
+      { name: 'a.txt', status: 'pending' },
+      { name: 'b.txt', status: 'pending' }
+    ];
+
+    const res = await request(app)
+      .post(`/api/upload-jobs/${job.id}/resume`)
+      .expect(200);
+
+    expect(res.body.success).toBe(true);
+    expect(uploadJobs.get(job.id).status).toBe('processing');
+    expect(processCloudImport).toHaveBeenCalledWith(expect.objectContaining({ jobId: job.id }));
   });
 });

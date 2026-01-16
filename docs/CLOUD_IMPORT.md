@@ -359,6 +359,8 @@ Cloud imports use the same progress tracking system as file uploads.
 
 **Actions**:
 - **Stop** - Stops after current file completes
+- **Back** - Available after stopping; returns to the upload modal without losing the previously analyzed cloud folder state
+- **Resume Upload** - Available after stopping (cloud imports only); continues importing the remaining queued files
 - **Close** - Closes modal (import continues in background)
 
 ### Progress Persistence
@@ -574,6 +576,12 @@ For large jobs, prefer paging the file list:
 **Endpoint**: `GET /api/upload-jobs/:jobId/files?offset=0&limit=200`
 - Returns a slice of file statuses: `{ filesTotal, offset, limit, files }`
 - Use this for scroll-driven fetching / virtualized rendering
+
+To resume a stopped cloud-import upload job:
+
+**Endpoint**: `POST /api/upload-jobs/:jobId/resume`
+- Only supported for **cloud import** jobs that were stopped (status `stopped`)
+- Local file uploads cannot be resumed (the server does not retain the original file payload)
 
 **For S3**:
 - Bucket is not public

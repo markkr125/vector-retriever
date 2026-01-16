@@ -429,8 +429,11 @@ uploadJobs.set(jobId, {
 - Polls job status every **1 second** (not 500ms)
 - File icons: ⏱️ pending, ⏳ processing, ✅ success, ❌ error
 - Stop button with confirmation dialog
+- When a job is stopped, show:
+  - **Back** button to return to `UploadModal.vue` without losing cloud-import analysis state
+  - **Resume Upload** button for cloud-import jobs to continue remaining queued files
 - Close button always visible (modal can be closed, upload continues)
-- **No auto-open on refresh** - button shows "Upload in progress..." but modal stays closed
+- **No auto-open on refresh** - header shows "Upload in progress..." only while the job is `processing`; modal stays closed
 - **Polling safeguards**: Uses watchers for `props.show` and `props.jobId` to prevent duplicate intervals
 - `startPolling()` calls `stopPolling()` first to ensure only one interval runs
 
@@ -477,6 +480,14 @@ Combines timestamp + auto-incrementing counter for uniqueness.
 - Each upload job owns an `abortController` (AbortSignal propagated through `documentService.processSingleFile(..., { signal })`).
 - Stop requests set `job.status='stopped'` and call `abortController.abort()` to cancel in-flight Ollama/embedding requests where supported.
 - The current file may be marked as cancelled (surfaced as an error on that file), and remaining files are skipped.
+
+**Resume Behavior (Cloud Import Uploads):**
+- A stopped upload job can be resumed only when it is a cloud-import job with a remaining queue/cursor.
+- API: `POST /api/upload-jobs/:jobId/resume` flips status back to `processing` and restarts the cloud-import worker from its saved cursor/queue.
+- Implementation uses a shared worker module (see `services/cloud-import-worker.js`) so the cloud-import route and resume endpoint reuse identical processing logic.
+
+**Preserving Upload Modal State (Back Button):**
+- To support Back (returning to the upload modal exactly as it was, including analyzed cloud folder state), keep `UploadModal.vue` mounted and toggle visibility (e.g., `v-show` + an `everOpened` flag) instead of destroying it with `v-if`.
 
 **Abortable Ollama Calls (Option C):**
 - Shared helper: `services/ollama-agent.js` (`runOllamaChat`) centralizes AbortSignal + JSONL stream collection.
@@ -585,9 +596,9 @@ Critical UI state persists across refreshes:
 - **Bookmarks**: `localStorage.getItem('bookmarkedDocuments')` in `ResultsList.vue` (Set → JSON array)
 - **Active uploads**: `localStorage.getItem('activeUploadJobId')` in `App.vue`
   - Job ID persists across page refresh
-  - Header button shows "Upload in progress..." when job active
+  - Header button shows "Upload in progress..." only while job is `processing`
   - **Modal does NOT auto-open** - user must click button to see progress
-  - Job state verified on mount: checks if still processing, clears if completed
+  - Job state verified on mount: checks if still `processing`, clears if `completed` or `stopped`
 - **NO query/filter state saved** - these come from URL params only
 
 ### Surprise Me Button
@@ -723,6 +734,7 @@ See `server.js` lines 906-940 for implementation pattern.
 - `GET /api/upload-jobs/:jobId` - Get upload job status by ID
 - `GET /api/upload-jobs/:jobId/files` - Paged file status slice for large jobs (use `offset` + `limit`)
 - `POST /api/upload-jobs/:jobId/stop` - Stop upload (finishes current file, skips rest)
+- `POST /api/upload-jobs/:jobId/resume` - Resume a stopped cloud-import upload job
 
 **Temp Files:**
 - `POST /api/temp-files` - Store temporary file for "search by document" feature

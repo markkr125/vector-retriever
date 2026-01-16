@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mock the API
 vi.mock('@/api', () => ({
   getUploadJobStatus: vi.fn(),
-  getUploadJobFiles: vi.fn()
+  getUploadJobFiles: vi.fn(),
+  resumeUploadJob: vi.fn()
 }));
 
 describe('UploadProgressModal.vue', () => {
@@ -21,6 +22,7 @@ describe('UploadProgressModal.vue', () => {
     failedFiles: 0,
     currentFile: 'file3.txt',
     currentStage: 'Embedding…',
+    source: 'cloud',
     filesTotal: 5,
     filesOffset: 0,
     filesLimit: 0,
@@ -30,6 +32,7 @@ describe('UploadProgressModal.vue', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     api.getUploadJobStatus.mockResolvedValue(mockJobData);
+    api.resumeUploadJob.mockResolvedValue({ success: true });
     api.getUploadJobFiles.mockResolvedValue({
       id: 'job_123',
       filesTotal: 5,
@@ -193,5 +196,66 @@ describe('UploadProgressModal.vue', () => {
     
     await wrapper.find('.btn-warning').trigger('click');
     expect(wrapper.emitted('stop')).toBeTruthy();
+  });
+
+  it('shows back + resume buttons when stopped (paused) cloud upload', async () => {
+    api.getUploadJobStatus.mockResolvedValue({
+      ...mockJobData,
+      status: 'stopped',
+      processedFiles: 2,
+      source: 'cloud'
+    });
+
+    wrapper = mount(UploadProgressModal, {
+      props: { show: true, jobId: 'job_123' }
+    });
+
+    await vi.advanceTimersByTimeAsync(50);
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).toContain('Back');
+    expect(wrapper.text()).toContain('Resume Upload');
+    expect(wrapper.find('.btn-warning').exists()).toBe(false);
+  });
+
+  it('emits back event when back clicked', async () => {
+    api.getUploadJobStatus.mockResolvedValue({
+      ...mockJobData,
+      status: 'stopped',
+      source: 'cloud'
+    });
+
+    wrapper = mount(UploadProgressModal, {
+      props: { show: true, jobId: 'job_123' }
+    });
+
+    await vi.advanceTimersByTimeAsync(50);
+    await wrapper.vm.$nextTick();
+
+    const backBtn = wrapper.findAll('button').find(b => b.text() === 'Back');
+    expect(backBtn).toBeTruthy();
+    await backBtn.trigger('click');
+    expect(wrapper.emitted('back')).toBeTruthy();
+  });
+
+  it('calls resume API when resume clicked (cloud upload)', async () => {
+    api.getUploadJobStatus.mockResolvedValue({
+      ...mockJobData,
+      status: 'stopped',
+      source: 'cloud'
+    });
+
+    wrapper = mount(UploadProgressModal, {
+      props: { show: true, jobId: 'job_123' }
+    });
+
+    await vi.advanceTimersByTimeAsync(50);
+    await wrapper.vm.$nextTick();
+
+    const resumeBtn = wrapper.findAll('button').find(b => b.text().includes('Resume Upload'));
+    expect(resumeBtn).toBeTruthy();
+    await resumeBtn.trigger('click');
+
+    expect(api.resumeUploadJob).toHaveBeenCalledWith('job_123');
   });
 });

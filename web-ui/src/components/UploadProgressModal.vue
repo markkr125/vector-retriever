@@ -62,12 +62,31 @@
       </div>
 
       <div class="modal-footer">
+        <button
+          v-if="canBack"
+          @click="handleBack"
+          class="btn btn-secondary"
+        >
+          Back
+        </button>
+
         <button 
           @click="handleClose" 
           class="btn btn-secondary"
         >
           Close
         </button>
+
+        <button
+          v-if="canResume"
+          @click="handleResume"
+          class="btn btn-primary"
+          :disabled="resuming"
+        >
+          <span v-if="resuming" class="loading"></span>
+          <span v-else>Resume Upload</span>
+        </button>
+
         <button 
           v-if="canStop"
           @click="confirmStop" 
@@ -82,7 +101,7 @@
 
 <script>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { getUploadJobFiles, getUploadJobStatus } from '../api';
+import { getUploadJobFiles, getUploadJobStatus, resumeUploadJob } from '../api';
 
 export default {
   name: 'UploadProgressModal',
@@ -96,7 +115,7 @@ export default {
       required: true
     }
   },
-  emits: ['close', 'stop'],
+  emits: ['close', 'stop', 'back'],
   setup(props, { emit }) {
     const jobData = ref(null);
     const filesTotal = ref(0);
@@ -117,6 +136,8 @@ export default {
     let scrollFilesAbortController = null;
     const pendingScrollFetch = ref({ offset: 0, limit: 0 });
 
+    const resuming = ref(false);
+
     const jobStatus = computed(() => jobData.value?.status || 'processing');
     const totalFiles = computed(() => jobData.value?.totalFiles || 0);
     const processedFiles = computed(() => jobData.value?.processedFiles || 0);
@@ -135,6 +156,18 @@ export default {
 
     const canStop = computed(() => {
       return jobStatus.value === 'processing';
+    });
+
+    const canBack = computed(() => {
+      // Treat "stopped" as "paused" for UX.
+      return jobStatus.value === 'stopped';
+    });
+
+    const canResume = computed(() => {
+      if (jobStatus.value !== 'stopped') return false;
+      // Resume is only supported for cloud-import jobs, since they keep a server-side queue.
+      if (jobData.value?.source !== 'cloud') return false;
+      return processedFiles.value < totalFiles.value;
     });
 
     const totalRows = computed(() => filesTotal.value || 0);
@@ -383,6 +416,27 @@ export default {
       }
     }
 
+    function handleBack() {
+      emit('back');
+    }
+
+    async function handleResume() {
+      if (!props.jobId) return;
+      if (resuming.value) return;
+      resuming.value = true;
+
+      try {
+        await resumeUploadJob(props.jobId);
+        // Optimistically flip status so the UI updates immediately.
+        jobData.value = { ...(jobData.value || {}), status: 'processing' };
+        startPolling();
+      } catch (error) {
+        console.error('Error resuming upload job:', error);
+      } finally {
+        resuming.value = false;
+      }
+    }
+
     onMounted(() => {
       if (props.show && props.jobId) {
         startPolling();
@@ -432,6 +486,9 @@ export default {
       progressPercent,
       isComplete,
       canStop,
+      canBack,
+      canResume,
+      resuming,
       statusTitle,
       statusDetail,
       currentStage,
@@ -441,7 +498,9 @@ export default {
       onFilesScroll,
       handleClose,
       handleOverlayClick,
-      confirmStop
+      confirmStop,
+      handleBack,
+      handleResume
     };
   }
 };

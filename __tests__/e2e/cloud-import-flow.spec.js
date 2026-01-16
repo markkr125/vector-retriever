@@ -4,13 +4,48 @@ test.describe('Cloud Import Flow E2E (mocked providers)', () => {
   test.beforeEach(async ({ page }) => {
     const NORMAL_FOLDER_URL = 'https://drive.google.com/drive/folders/FAKE_FOLDER';
     const PAUSE_FOLDER_URL = 'https://drive.google.com/drive/folders/FAKE_FOLDER_PAUSE';
+    const STOP_RESUME_FOLDER_URL = 'https://drive.google.com/drive/folders/FAKE_FOLDER_STOP_RESUME';
     const isPauseUrl = (value) => typeof value === 'string' && value.includes('FAKE_FOLDER_PAUSE');
+    const isStopResumeUrl = (value) => typeof value === 'string' && value.includes('FAKE_FOLDER_STOP_RESUME');
 
     const analysisState = {
       // normal analyze -> completed
       analysis_test_1: { status: 'analyzing', pollCount: 0, provider: 'gdrive', url: NORMAL_FOLDER_URL },
       // pause -> resume -> completed
-      analysis_pause_1: { status: 'analyzing', pollCount: 0, provider: 'gdrive', url: PAUSE_FOLDER_URL, pausedOnce: false, resumedOnce: false }
+      analysis_pause_1: { status: 'analyzing', pollCount: 0, provider: 'gdrive', url: PAUSE_FOLDER_URL, pausedOnce: false, resumedOnce: false },
+      // normal analyze -> completed (used for stop/resume upload test)
+      analysis_stop_resume_1: { status: 'analyzing', pollCount: 0, provider: 'gdrive', url: STOP_RESUME_FOLDER_URL }
+    };
+
+    const uploadJobState = {
+      job_cloud_test_1: {
+        id: 'job_cloud_test_1',
+        status: 'completed',
+        pollCount: 0,
+        totalFiles: 1,
+        processedFiles: 1,
+        successfulFiles: 1,
+        failedFiles: 0,
+        currentFile: null,
+        currentStage: null,
+        source: 'cloud',
+        provider: 'gdrive',
+        resumedOnce: false
+      },
+      job_cloud_stop_resume_1: {
+        id: 'job_cloud_stop_resume_1',
+        status: 'processing',
+        pollCount: 0,
+        totalFiles: 3,
+        processedFiles: 1,
+        successfulFiles: 1,
+        failedFiles: 0,
+        currentFile: 'doc2.txt',
+        currentStage: 'Embedding…',
+        source: 'cloud',
+        provider: 'gdrive',
+        resumedOnce: false
+      }
     };
 
     // Mock provider availability to show Google Drive option in the UI.
@@ -85,6 +120,15 @@ test.describe('Cloud Import Flow E2E (mocked providers)', () => {
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ jobId: 'analysis_pause_1', status: 'analyzing' })
+        });
+        return;
+      }
+
+      if (isStopResumeUrl(url)) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ jobId: 'analysis_stop_resume_1', status: 'analyzing' })
         });
         return;
       }
@@ -176,6 +220,53 @@ test.describe('Cloud Import Flow E2E (mocked providers)', () => {
             files: [
               { id: 'g1', name: 'doc1.pdf', size: 10, mimeType: 'application/pdf', extension: '.pdf' },
               { id: 'g2', name: 'doc2.txt', size: 5, mimeType: 'text/plain', extension: '.txt' }
+            ],
+            error: null,
+            startTime: Date.now() - 50,
+            endTime: Date.now()
+          })
+        });
+        return;
+      }
+
+      if (jobId === 'analysis_stop_resume_1') {
+        if (state.pollCount < 2) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              jobId,
+              status: 'analyzing',
+              provider: state.provider,
+              url: state.url,
+              filesDiscovered: 2,
+              totalSize: 15,
+              fileTypes: { '.pdf': 1, '.txt': 1 },
+              pagesProcessed: 1,
+              error: null,
+              startTime: Date.now(),
+              endTime: null
+            })
+          });
+          return;
+        }
+
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            jobId,
+            status: 'completed',
+            provider: state.provider,
+            url: state.url,
+            filesDiscovered: 3,
+            totalSize: 25,
+            fileTypes: { '.pdf': 2, '.txt': 1 },
+            pagesProcessed: 2,
+            files: [
+              { id: 'g1', name: 'doc1.pdf', size: 10, mimeType: 'application/pdf', extension: '.pdf' },
+              { id: 'g2', name: 'doc2.txt', size: 5, mimeType: 'text/plain', extension: '.txt' },
+              { id: 'g3', name: 'doc3.pdf', size: 10, mimeType: 'application/pdf', extension: '.pdf' }
             ],
             error: null,
             startTime: Date.now() - 50,
@@ -294,6 +385,22 @@ test.describe('Cloud Import Flow E2E (mocked providers)', () => {
 
     // Mock cloud import start
     await page.route('**/api/cloud-import/import**', async (route) => {
+      const body = route.request().postDataJSON?.() || {};
+      const url = body?.url;
+
+      if (isStopResumeUrl(url)) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            jobId: 'job_cloud_stop_resume_1',
+            message: 'Cloud import job started',
+            totalFiles: 3
+          })
+        });
+        return;
+      }
+
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -305,42 +412,143 @@ test.describe('Cloud Import Flow E2E (mocked providers)', () => {
       });
     });
 
-    // Mock job status polling (UploadProgressModal)
-    await page.route('**/api/upload-jobs/job_cloud_test_1**', async (route) => {
+    // Upload jobs: stop/resume + polling endpoints (UploadProgressModal)
+    // Note: Axios interceptor adds `?collection=...` to all requests, so match query params too.
+
+    await page.route('**/api/upload-jobs/*/stop*', async (route) => {
+      const requestUrl = new URL(route.request().url());
+      const pathParts = requestUrl.pathname.split('/');
+      const jobId = pathParts[pathParts.length - 2];
+      const state = uploadJobState[jobId];
+
+      if (!state) {
+        await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'Job not found' }) });
+        return;
+      }
+
+      state.status = 'stopped';
+
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          id: 'job_cloud_test_1',
-          status: 'completed',
-          totalFiles: 1,
-          processedFiles: 1,
-          successfulFiles: 1,
-          failedFiles: 0,
-          currentFile: null,
-          currentStage: null,
-          startTime: Date.now() - 100,
-          endTime: Date.now(),
-          source: 'cloud',
-          provider: 'gdrive',
-          filesTotal: 1,
-          filesOffset: 0,
-          filesLimit: 0,
-          files: []
-        })
+        body: JSON.stringify({ id: jobId, status: 'stopped' })
       });
     });
 
-    await page.route('**/api/upload-jobs/job_cloud_test_1/files?*', async (route) => {
+    await page.route('**/api/upload-jobs/*/resume*', async (route) => {
+      const requestUrl = new URL(route.request().url());
+      const pathParts = requestUrl.pathname.split('/');
+      const jobId = pathParts[pathParts.length - 2];
+      const state = uploadJobState[jobId];
+
+      if (!state) {
+        await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'Job not found' }) });
+        return;
+      }
+
+      state.status = 'processing';
+      state.resumedOnce = true;
+      state.pollCount = 0;
+      state.currentFile = 'doc3.pdf';
+      state.currentStage = 'Saving…';
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: jobId, status: 'processing', resumed: true })
+      });
+    });
+
+    await page.route('**/api/upload-jobs/*/files?*', async (route) => {
+      const requestUrl = new URL(route.request().url());
+      const pathParts = requestUrl.pathname.split('/');
+      const jobId = pathParts[pathParts.length - 2];
+
+      if (jobId === 'job_cloud_test_1') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            id: 'job_cloud_test_1',
+            filesTotal: 1,
+            offset: 0,
+            limit: 200,
+            files: [{ name: 'doc1.pdf', status: 'success', id: 'doc_g1', error: null, bucket: null }]
+          })
+        });
+        return;
+      }
+
+      if (jobId === 'job_cloud_stop_resume_1') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            id: 'job_cloud_stop_resume_1',
+            filesTotal: 3,
+            offset: 0,
+            limit: 200,
+            files: [
+              { name: 'doc1.pdf', status: 'success', id: 'doc_g1', error: null, bucket: null },
+              { name: 'doc2.txt', status: 'success', id: 'doc_g2', error: null, bucket: null },
+              { name: 'doc3.pdf', status: 'pending', id: 'doc_g3', error: null, bucket: null }
+            ]
+          })
+        });
+        return;
+      }
+
+      await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'Job not found' }) });
+    });
+
+    await page.route('**/api/upload-jobs/*', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.fulfill({ status: 405, contentType: 'application/json', body: JSON.stringify({ error: 'Method not allowed' }) });
+        return;
+      }
+
+      const requestUrl = new URL(route.request().url());
+      const pathParts = requestUrl.pathname.split('/');
+      const jobId = pathParts[pathParts.length - 1];
+      const state = uploadJobState[jobId];
+
+      if (!state) {
+        await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'Job not found' }) });
+        return;
+      }
+
+      state.pollCount += 1;
+
+      // After resume: report processing once, then completed.
+      if (jobId === 'job_cloud_stop_resume_1' && state.status === 'processing' && state.resumedOnce && state.pollCount >= 2) {
+        state.status = 'completed';
+        state.processedFiles = 3;
+        state.successfulFiles = 3;
+        state.failedFiles = 0;
+        state.currentFile = null;
+        state.currentStage = null;
+      }
+
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          id: 'job_cloud_test_1',
-          filesTotal: 1,
-          offset: 0,
-          limit: 200,
-          files: [{ name: 'doc1.pdf', status: 'success', id: 'doc_g1', error: null, bucket: null }]
+          id: state.id,
+          status: state.status,
+          totalFiles: state.totalFiles,
+          processedFiles: state.processedFiles,
+          successfulFiles: state.successfulFiles,
+          failedFiles: state.failedFiles,
+          currentFile: state.currentFile,
+          currentStage: state.currentStage,
+          startTime: Date.now() - 100,
+          endTime: state.status === 'completed' ? Date.now() : null,
+          source: state.source,
+          provider: state.provider,
+          filesTotal: state.totalFiles,
+          filesOffset: 0,
+          filesLimit: 0,
+          files: []
         })
       });
     });
@@ -368,7 +576,7 @@ test.describe('Cloud Import Flow E2E (mocked providers)', () => {
 
   test('analyze Google Drive folder and start import (mocked)', async ({ page }) => {
     // Open upload modal
-    await page.locator('button').filter({ hasText: 'Add Document' }).first().click();
+    await page.getByRole('button', { name: '➕ Add Document' }).click();
     await expect(page.locator('.upload-modal-overlay')).toBeVisible({ timeout: 5000 });
 
     // Switch to Cloud Import
@@ -405,7 +613,7 @@ test.describe('Cloud Import Flow E2E (mocked providers)', () => {
 
   test('pause analysis, use partial results, then continue analysis (mocked)', async ({ page }) => {
     // Open upload modal
-    await page.locator('button').filter({ hasText: 'Add Document' }).first().click();
+    await page.getByRole('button', { name: '➕ Add Document' }).click();
     await expect(page.locator('.upload-modal-overlay')).toBeVisible({ timeout: 5000 });
 
     const uploadOverlay = page.locator('.upload-modal-overlay');
@@ -443,8 +651,15 @@ test.describe('Cloud Import Flow E2E (mocked providers)', () => {
     await page.locator('.upload-modal .close-btn').click();
     await expect(page.locator('.upload-modal-overlay')).toBeHidden({ timeout: 5000 });
 
+    // UploadModal is kept mounted (v-show) to preserve state for the "Back" UX.
+    // To simulate leaving and coming back later (new session), do a full reload so
+    // the by-url lookup + Continue Analysis flow is still validated.
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(250);
+
     // Re-open upload modal and re-enter the same URL; by-url lookup should enable Continue
-    await page.locator('button').filter({ hasText: 'Add Document' }).first().click();
+    await page.getByRole('button', { name: '➕ Add Document' }).click();
     await expect(page.locator('.upload-modal-overlay')).toBeVisible({ timeout: 5000 });
 
     const uploadOverlay2 = page.locator('.upload-modal-overlay');
@@ -475,5 +690,99 @@ test.describe('Cloud Import Flow E2E (mocked providers)', () => {
     // Wait for completion and updated file count
     await expect(page.locator('.analysis-results')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.analysis-results')).toContainText(/3/);
+  });
+
+  test('stopped upload shows Back/Resume; Back preserves analysis state; closing returns header to Add Document (mocked)', async ({ page }) => {
+    // Open upload modal
+    await page.getByRole('button', { name: '➕ Add Document' }).click();
+    await expect(page.locator('.upload-modal-overlay')).toBeVisible({ timeout: 5000 });
+
+    // Switch to Cloud Import
+    await page.locator('button').filter({ hasText: 'Cloud Import' }).click();
+    await page.locator('button').filter({ hasText: 'Google Drive' }).click();
+
+    const cloudSection = page.locator('.upload-modal-overlay').locator('.cloud-import-section');
+    await cloudSection
+      .getByPlaceholder('https://drive.google.com/drive/folders/FOLDER_ID')
+      .fill('https://drive.google.com/drive/folders/FAKE_FOLDER_STOP_RESUME');
+
+    // Analyze folder
+    await page.locator('button').filter({ hasText: 'Analyze Folder' }).click();
+    await expect(page.locator('.analysis-results')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.analysis-results')).toContainText(/Total Files/i);
+    await expect(page.locator('.analysis-results')).toContainText(/3/);
+
+    // Import first 3
+    await cloudSection.locator('input[type="radio"][value="first"]').check();
+    await cloudSection.locator('input[type="number"]').first().fill('3');
+
+    // Start import
+    await page.locator('button[type="submit"]').first().click();
+    await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 5000 });
+
+    // Stop upload
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('.modal-overlay button').filter({ hasText: 'Stop Upload' }).click();
+
+    await expect(page.locator('.modal-overlay')).toContainText(/stopped/i, { timeout: 10000 });
+    await expect(page.locator('.modal-overlay button').filter({ hasText: 'Back' })).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.modal-overlay button').filter({ hasText: 'Resume Upload' })).toBeVisible({ timeout: 5000 });
+
+    // Back should reopen UploadModal with prior analysis still present
+    await page.locator('.modal-overlay button').filter({ hasText: 'Back' }).click();
+    await expect(page.locator('.upload-modal-overlay')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.analysis-results')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.analysis-results')).toContainText(/Total Files/i);
+
+    // Close upload modal; since the job was stopped, the header should return to "Add Document".
+    await page.locator('.upload-modal .close-btn').click();
+    await expect(page.locator('.upload-modal-overlay')).toBeHidden({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: '➕ Add Document' })).toBeVisible({ timeout: 5000 });
+  });
+
+  test('stopped upload can be resumed from the progress modal (mocked)', async ({ page }) => {
+    // Open upload modal
+    await page.getByRole('button', { name: '➕ Add Document' }).click();
+    await expect(page.locator('.upload-modal-overlay')).toBeVisible({ timeout: 5000 });
+
+    // Switch to Cloud Import
+    await page.locator('button').filter({ hasText: 'Cloud Import' }).click();
+    await page.locator('button').filter({ hasText: 'Google Drive' }).click();
+
+    const cloudSection = page.locator('.upload-modal-overlay').locator('.cloud-import-section');
+    await cloudSection
+      .getByPlaceholder('https://drive.google.com/drive/folders/FOLDER_ID')
+      .fill('https://drive.google.com/drive/folders/FAKE_FOLDER_STOP_RESUME');
+
+    // Analyze folder
+    await page.locator('button').filter({ hasText: 'Analyze Folder' }).click();
+    await expect(page.locator('.analysis-results')).toBeVisible({ timeout: 5000 });
+
+    // Import first 3
+    await cloudSection.locator('input[type="radio"][value="first"]').check();
+    await cloudSection.locator('input[type="number"]').first().fill('3');
+
+    // Start import
+    await page.locator('button[type="submit"]').first().click();
+    await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 5000 });
+
+    // Stop upload
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('.modal-overlay button').filter({ hasText: 'Stop Upload' }).click();
+    await expect(page.locator('.modal-overlay')).toContainText(/stopped/i, { timeout: 10000 });
+
+    const resumeCall = page.waitForResponse((resp) => {
+      const url = resp.url();
+      return url.includes('/api/upload-jobs/job_cloud_stop_resume_1/resume') && resp.status() === 200;
+    });
+
+    await page.locator('.modal-overlay button').filter({ hasText: 'Resume Upload' }).click();
+    await resumeCall;
+
+    await expect(page.locator('.modal-overlay')).toContainText(/completed|success/i, { timeout: 10000 });
+
+    // Close progress modal; job is complete so header should be Add Document
+    await page.locator('.modal-overlay button').filter({ hasText: 'Close' }).click();
+    await expect(page.getByRole('button', { name: '➕ Add Document' })).toBeVisible({ timeout: 5000 });
   });
 });

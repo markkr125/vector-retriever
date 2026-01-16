@@ -32,7 +32,7 @@
             <div class="add-document-section">
               <button 
                 v-if="!hasActiveUpload" 
-                @click="showUploadModal = true" 
+                @click="openUploadModal" 
                 class="btn btn-add"
               >
                 ➕ Add Document
@@ -176,8 +176,9 @@
     </footer>
 
     <!-- Upload Modal -->
-    <UploadModal 
-      v-if="showUploadModal"
+    <UploadModal
+      v-if="uploadModalEverOpened"
+      v-show="showUploadModal"
       @close="showUploadModal = false"
       @success="handleUploadSuccess"
       @job-started="handleJobStarted"
@@ -190,6 +191,7 @@
       :job-id="activeJobId"
       @close="handleProgressModalClose"
       @stop="handleStopUpload"
+      @back="handleProgressModalBack"
     />
 
     <!-- PII Details Modal -->
@@ -614,6 +616,7 @@ const currentQuery = ref('')
 const searchType = ref('')
 const stats = ref(null)
 const showUploadModal = ref(false)
+const uploadModalEverOpened = ref(false)
 const showProgressModal = ref(false)
 const activeJobId = ref(null)
 const showPIIModal = ref(false)
@@ -660,6 +663,11 @@ const bookmarksFilenameFilter = ref('') // Filename filter
 const hasActiveUpload = computed(() => !!activeJobId.value)
 const lastSearchParams = ref(null) // Track last search parameters
 const similarDocumentId = ref(null) // Track current Find Similar source document
+
+const openUploadModal = () => {
+  uploadModalEverOpened.value = true
+  showUploadModal.value = true
+}
 
 // Helper function to build filters with OR within type, AND between types
 const buildFiltersWithOr = () => {
@@ -1372,15 +1380,21 @@ const handleProgressModalClose = async () => {
     // Check job status first
     try {
       const response = await api.get(`/upload-jobs/${activeJobId.value}`)
-      if (response.data.status === 'completed' || response.data.status === 'stopped') {
-        activeJobId.value = null
-        localStorage.removeItem('activeUploadJobId')
-        
-        // Reload stats and results
+      const status = response.data.status
+
+      // Reload stats and results when the job is no longer actively processing.
+      if (status === 'completed' || status === 'stopped') {
         await handleUploadSuccess()
         if (currentQuery.value) {
           performSearch()
         }
+      }
+
+      // Clear the job when processing has ended. If the user stopped an upload,
+      // we intentionally return the header button to "Add Document".
+      if (status === 'completed' || status === 'stopped') {
+        activeJobId.value = null
+        localStorage.removeItem('activeUploadJobId')
       }
     } catch (error) {
       console.error('Error checking job status:', error)
@@ -1389,6 +1403,17 @@ const handleProgressModalClose = async () => {
       localStorage.removeItem('activeUploadJobId')
     }
   }
+}
+
+const handleProgressModalBack = () => {
+  showProgressModal.value = false
+  // "Back" is only available when the job is stopped; treat it as a terminal
+  // state for the header button.
+  activeJobId.value = null
+  localStorage.removeItem('activeUploadJobId')
+  // Re-open the UploadModal (kept mounted via v-show) so the user returns to the
+  // exact state they left off (e.g., analyzed S3/Google Drive folder).
+  openUploadModal()
 }
 
 // Handle stop upload

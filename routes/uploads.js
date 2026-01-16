@@ -1,5 +1,6 @@
 const express = require('express');
 const { isAbortError } = require('../services/ollama-agent');
+const { processCloudImport } = require('../services/cloud-import-worker');
 
 function clampInt(value, { min, max, fallback }) {
   const parsed = parseInt(value, 10);
@@ -252,6 +253,50 @@ function createUploadsRoutes({
     console.log(`Job ${jobId} marked for stopping`);
 
     res.json({ success: true, message: job.abortController ? 'Job cancelled' : 'Job will stop after current file completes' });
+  });
+
+  // Resume a previously stopped (paused) cloud import upload job.
+  router.post('/upload-jobs/:jobId/resume', (req, res) => {
+    const { jobId } = req.params;
+    const job = uploadJobs.get(jobId);
+
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    if (job.status !== 'stopped') {
+      return res.status(400).json({ error: 'Job is not paused' });
+    }
+
+    if (job.source !== 'cloud') {
+      return res.status(400).json({ error: 'Resume is only supported for cloud import jobs' });
+    }
+
+    if (!Array.isArray(job.cloudImportQueue) || typeof job.cloudImportCursor !== 'number') {
+      return res.status(400).json({ error: 'Cloud import job is missing resume state' });
+    }
+
+    if (job.cloudImportCursor >= job.cloudImportQueue.length) {
+      return res.status(400).json({ error: 'Job has no remaining files to process' });
+    }
+
+    // Reset abort state and resume processing.
+    try {
+      job.abortController = new AbortController();
+    } catch {
+      // ignore
+    }
+
+    job.status = 'processing';
+    job.endTime = null;
+    job.currentFile = null;
+    job.currentStage = null;
+
+    processCloudImport({ jobId, documentService }).catch(error => {
+      console.error('Cloud import resume processing error:', error);
+    });
+
+    return res.json({ success: true, message: 'Job resumed' });
   });
 
   return router;
