@@ -77,7 +77,15 @@ function parseS3Url(url) {
  * @param {string} retryRegion - Region to retry with (internal)
  */
 async function analyzeS3Folder(s3Url, options = {}, retryRegion = null) {
-  const { onProgress, abortSignal, resumeFromContinuationToken } = options;
+  const {
+    onProgress,
+    abortSignal,
+    resumeFromContinuationToken,
+    resumeFiles,
+    resumeTotalSize,
+    resumeFileTypes,
+    resumePagesProcessed
+  } = options;
   const { bucket, prefix, region } = parseS3Url(s3Url);
 
   // Use retry region if provided, otherwise parsed region, otherwise default
@@ -94,11 +102,11 @@ async function analyzeS3Folder(s3Url, options = {}, retryRegion = null) {
     signer: { sign: async (request) => request }
   });
 
-  const files = [];
+  const files = Array.isArray(resumeFiles) ? [...resumeFiles] : [];
   let continuationToken = resumeFromContinuationToken || null;
-  let totalSize = 0;
-  const fileTypes = {};
-  let pagesProcessed = 0;
+  let totalSize = typeof resumeTotalSize === 'number' ? resumeTotalSize : 0;
+  const fileTypes = resumeFileTypes && typeof resumeFileTypes === 'object' ? { ...resumeFileTypes } : {};
+  let pagesProcessed = typeof resumePagesProcessed === 'number' ? resumePagesProcessed : 0;
 
   try {
     // List all objects in the bucket/prefix
@@ -262,7 +270,15 @@ async function analyzeGoogleDriveFolder(shareLink, options = {}) {
     throw new Error('Google Drive API key not configured. Set GOOGLE_DRIVE_API_KEY in .env');
   }
 
-  const { onProgress, abortSignal, resumeFromPageToken } = options;
+  const {
+    onProgress,
+    abortSignal,
+    resumeFromPageToken,
+    resumeFiles,
+    resumeTotalSize,
+    resumeFileTypes,
+    resumePagesProcessed
+  } = options;
   const folderId = parseGoogleDriveFolderUrl(shareLink);
 
   // Initialize Google Drive API with API key
@@ -271,11 +287,11 @@ async function analyzeGoogleDriveFolder(shareLink, options = {}) {
     auth: process.env.GOOGLE_DRIVE_API_KEY
   });
 
-  const files = [];
-  let totalSize = 0;
-  const fileTypes = {};
+  const files = Array.isArray(resumeFiles) ? [...resumeFiles] : [];
+  let totalSize = typeof resumeTotalSize === 'number' ? resumeTotalSize : 0;
+  const fileTypes = resumeFileTypes && typeof resumeFileTypes === 'object' ? { ...resumeFileTypes } : {};
   let pageToken = resumeFromPageToken || null;
-  let pagesProcessed = 0;
+  let pagesProcessed = typeof resumePagesProcessed === 'number' ? resumePagesProcessed : 0;
 
   try {
     // List all files in the folder

@@ -336,6 +336,19 @@
   color: #6c757d;
 }
 
+.file-path {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #868e96;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  unicode-bidi: plaintext;
+  direction: ltr;
+  text-align: left;
+}
+
 .file-type {
   text-transform: uppercase;
   font-weight: 600;

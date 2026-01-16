@@ -133,6 +133,13 @@
             />
             <div class="file-info">
               <div class="file-name" :title="file.name">{{ file.name }}</div>
+              <div
+                v-if="isGlobalFilterMode && getFileFolderPath(file)"
+                class="file-path"
+                :title="getFileFolderPath(file)"
+              >
+                📁 {{ getFileFolderPath(file) }}
+              </div>
               <div class="file-meta">
                 <span class="file-type">{{ file.extension }}</span>
                 <span class="file-size">{{ formatBytes(file.size) }}</span>
@@ -214,6 +221,10 @@ const currentPage = ref(1)
 const currentFolder = ref('')
 const itemsPerPage = 20
 
+const isGlobalFilterMode = computed(() => {
+  return hasFolderNavigation.value && (searchQuery.value || selectedType.value || selectedSizeRange.value)
+})
+
 // Computed
 const normalizedRootPrefix = computed(() => {
   if (!props.rootPrefix) return ''
@@ -276,6 +287,9 @@ const currentFolderNode = computed(() => folderIndex.value.get(currentFolder.val
 
 const currentFolders = computed(() => {
   if (!hasFolderNavigation.value) return []
+  // When global filters are active, show matching files across all folders.
+  // Showing the folder list at the same time is confusing.
+  if (searchQuery.value || selectedType.value || selectedSizeRange.value) return []
   const base = currentFolder.value
   return Array.from(currentFolderNode.value.folders)
     .map(name => ({
@@ -288,6 +302,15 @@ const currentFolders = computed(() => {
 const currentFolderFiles = computed(() => {
   if (!hasFolderNavigation.value) return props.files
   return currentFolderNode.value.files
+})
+
+const filesForFiltering = computed(() => {
+  // With folder navigation, the default view is scoped to the current folder.
+  // But when the user applies filters, treat it as a global search/filter over
+  // all files (so selecting a file type at Root can still find matches).
+  if (!hasFolderNavigation.value) return props.files
+  if (searchQuery.value || selectedType.value || selectedSizeRange.value) return props.files
+  return currentFolderFiles.value
 })
 
 const breadcrumbs = computed(() => {
@@ -306,14 +329,16 @@ const breadcrumbs = computed(() => {
 
 const availableTypes = computed(() => {
   const types = new Set()
-  currentFolderFiles.value.forEach(file => {
+  // Use the full file list to populate the dropdown even when the current folder
+  // contains only subfolders (no files).
+  props.files.forEach(file => {
     if (file.extension) types.add(file.extension)
   })
   return Array.from(types).sort()
 })
 
 const filteredFiles = computed(() => {
-  let filtered = currentFolderFiles.value
+  let filtered = filesForFiltering.value
 
   // Search filter
   if (searchQuery.value) {
@@ -362,6 +387,21 @@ const getFileIdentity = (file) => {
   const size = typeof file?.size === 'number' ? file.size : parseInt(file?.size || 0, 10)
   const lastModified = file?.lastModified ?? ''
   return `${name}|${size}|${lastModified}`
+}
+
+const getFileFolderPath = (file) => {
+  // Only meaningful for path-like providers (S3). Google Drive items generally
+  // don't have a stable folder path in our current analysis results.
+  if (!hasFolderNavigation.value) return ''
+  const key = typeof file?.key === 'string' ? file.key : ''
+  if (!key) return ''
+
+  const rootPrefix = normalizedRootPrefix.value
+  const relKey = rootPrefix && key.startsWith(rootPrefix) ? key.slice(rootPrefix.length) : key
+
+  const parts = relKey.split('/').filter(Boolean)
+  if (parts.length <= 1) return 'Root'
+  return parts.slice(0, -1).join('/')
 }
 
 const isSelected = (file) => {

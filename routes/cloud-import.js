@@ -26,7 +26,12 @@ function createCloudImportRoutes({ collectionMiddleware, documentService, embedd
           },
           abortSignal: job.abortController.signal,
           resumeFromContinuationToken: job.s3ContinuationToken || null,
-          resumeFromPageToken: job.gdrivePageToken || null
+          resumeFromPageToken: job.gdrivePageToken || null,
+          // Preserve previously accumulated stats on resume.
+          resumeFiles: Array.isArray(job.files) ? job.files : [],
+          resumeTotalSize: typeof job.totalSize === 'number' ? job.totalSize : 0,
+          resumeFileTypes: job.fileTypes && typeof job.fileTypes === 'object' ? job.fileTypes : {},
+          resumePagesProcessed: typeof job.pagesProcessed === 'number' ? job.pagesProcessed : 0
         };
 
         let analysis;
