@@ -169,6 +169,106 @@ describe('cloud-import routes (unit)', () => {
     expect(status.body.error).toBe(null);
   });
 
+  test('Pause analysis keeps partial results and POST /analyze resumes from saved cursor for same URL', async () => {
+    const mockFilesPage1 = [
+      {
+        key: 'folder/a.pdf',
+        name: 'a.pdf',
+        size: 10,
+        lastModified: '2024-01-01T00:00:00Z',
+        extension: '.pdf'
+      },
+      {
+        key: 'folder/b.txt',
+        name: 'b.txt',
+        size: 5,
+        lastModified: '2024-01-02T00:00:00Z',
+        extension: '.txt'
+      }
+    ];
+
+    const analyzeSpy = jest.spyOn(cloudImportService, 'analyzeS3Folder');
+
+    analyzeSpy.mockImplementationOnce((_url, options) => {
+      // Simulate a first page found, with a continuation token to resume from
+      options?.onProgress?.({
+        filesDiscovered: 2,
+        pagesProcessed: 1,
+        totalSize: 15,
+        fileTypes: { '.pdf': 1, '.txt': 1 },
+        s3ContinuationToken: 'TOKEN_1',
+        files: mockFilesPage1
+      });
+
+      const signal = options?.abortSignal;
+      return new Promise((_resolve, reject) => {
+        if (!signal) return reject(new Error('Missing abortSignal'));
+        signal.addEventListener('abort', () => {
+          const err = new Error('Aborted');
+          err.name = 'AbortError';
+          reject(err);
+        });
+      });
+    });
+
+    analyzeSpy.mockImplementationOnce(async (_url, options) => {
+      // Resume must use saved continuation token
+      expect(options?.resumeFromContinuationToken).toBe('TOKEN_1');
+      return {
+        files: mockFilesPage1,
+        totalSize: 15,
+        fileTypes: { '.pdf': 1, '.txt': 1 }
+      };
+    });
+
+    const app = createApp();
+
+    const start = await request(app)
+      .post('/api/cloud-import/analyze')
+      .send({ provider: 's3', url: 'https://bucket.s3.amazonaws.com/folder/' })
+      .expect(200);
+
+    // Wait until progress was written
+    await waitFor(() => analysisJobs.get(start.body.jobId)?.filesDiscovered === 2);
+
+    // Pause
+    const paused = await request(app)
+      .post(`/api/cloud-import/analysis-jobs/${start.body.jobId}/pause`)
+      .send({})
+      .expect(200);
+
+    expect(paused.body.status).toBe('paused');
+    await waitFor(() => analysisJobs.get(start.body.jobId)?.status === 'paused');
+
+    // Verify lookup by URL finds resumable job
+    const lookup = await request(app)
+      .get('/api/cloud-import/analysis-jobs/by-url')
+      .query({ provider: 's3', url: 'https://bucket.s3.amazonaws.com/folder/' })
+      .expect(200);
+    expect(lookup.body.found).toBe(true);
+    expect(lookup.body.status).toBe('paused');
+    expect(lookup.body.jobId).toBe(start.body.jobId);
+
+    // Verify partial files can be retrieved while paused
+    const statusWithFiles = await request(app)
+      .get(`/api/cloud-import/analysis-jobs/${start.body.jobId}`)
+      .query({ includeFiles: '1' })
+      .expect(200);
+    expect(statusWithFiles.body.status).toBe('paused');
+    expect(statusWithFiles.body.files).toHaveLength(2);
+
+    // Resume via /analyze (same URL)
+    const resume = await request(app)
+      .post('/api/cloud-import/analyze')
+      .send({ provider: 's3', url: 'https://bucket.s3.amazonaws.com/folder/' })
+      .expect(200);
+
+    expect(resume.body.jobId).toBe(start.body.jobId);
+    expect(resume.body.resumed).toBe(true);
+
+    await waitFor(() => analysisJobs.get(start.body.jobId)?.status === 'completed');
+  });
+
   test('POST /api/cloud-import/import starts a cloud import job and processes files using mocked download + processSingleFile', async () => {
     jest
       .spyOn(cloudImportService, 'downloadS3File')

@@ -32,6 +32,10 @@ function createAnalysisJob(provider, url) {
     totalSize: 0,
     fileTypes: {},
     pagesProcessed: 0,
+
+    // Resumable cursor state
+    s3ContinuationToken: null,
+    gdrivePageToken: null,
     
     // Results
     files: [],
@@ -41,6 +45,7 @@ function createAnalysisJob(provider, url) {
     
     // Timestamps
     startTime: Date.now(),
+    lastUpdatedAt: Date.now(),
     endTime: null,
     
     // Error tracking
@@ -66,7 +71,61 @@ function updateAnalysisProgress(jobId, updates) {
   if (!job) return null;
   
   Object.assign(job, updates);
+  job.lastUpdatedAt = Date.now();
   return job;
+}
+
+function markJobPaused(jobId) {
+  const job = analysisJobs.get(jobId);
+  if (!job) return null;
+
+  // Trigger abort signal to stop work quickly.
+  job.abortController.abort();
+  job.status = 'paused';
+  job.endTime = Date.now();
+  job.lastUpdatedAt = Date.now();
+  return job;
+}
+
+function resumePausedJob(jobId) {
+  const job = analysisJobs.get(jobId);
+  if (!job) return null;
+
+  job.status = 'analyzing';
+  job.endTime = null;
+  job.error = null;
+  job.abortController = new AbortController();
+  job.lastUpdatedAt = Date.now();
+  return job;
+}
+
+function findRecentResumableJobByUrl(provider, url, { maxAgeMs = 10 * 60 * 1000 } = {}) {
+  if (!provider || !url) return null;
+  const now = Date.now();
+
+  let best = null;
+  for (const job of analysisJobs.values()) {
+    if (job.provider !== provider) continue;
+    if (job.url !== url) continue;
+
+    // Prefer paused jobs; allow attaching to in-flight analyzing jobs too.
+    if (job.status !== 'paused' && job.status !== 'analyzing') continue;
+
+    const ts = job.status === 'paused' && job.endTime ? job.endTime : job.lastUpdatedAt || job.startTime;
+    if (ts && now - ts > maxAgeMs) continue;
+
+    if (!best) {
+      best = job;
+      continue;
+    }
+
+    const bestTs = best.status === 'paused' && best.endTime ? best.endTime : best.lastUpdatedAt || best.startTime;
+    if ((ts || 0) > (bestTs || 0)) {
+      best = job;
+    }
+  }
+
+  return best;
 }
 
 /**
@@ -82,6 +141,7 @@ function completeAnalysisJob(jobId, files, totalSize, fileTypes) {
   job.totalSize = totalSize;
   job.fileTypes = fileTypes;
   job.endTime = Date.now();
+  job.lastUpdatedAt = Date.now();
   
   return job;
 }
@@ -97,6 +157,7 @@ function cancelAnalysisJob(jobId) {
   job.abortController.abort();
   job.status = 'cancelled';
   job.endTime = Date.now();
+  job.lastUpdatedAt = Date.now();
   
   return job;
 }
@@ -111,6 +172,7 @@ function failAnalysisJob(jobId, error) {
   job.status = 'error';
   job.error = error.message || String(error);
   job.endTime = Date.now();
+  job.lastUpdatedAt = Date.now();
   
   return job;
 }
@@ -131,7 +193,8 @@ function cleanupOldJobs(maxAge = 10 * 60 * 1000) {
   const jobsToDelete = [];
   
   for (const [jobId, job] of analysisJobs.entries()) {
-    // Only cleanup finished jobs (completed, cancelled, error)
+    // Cleanup finished jobs (completed, cancelled, paused, error)
+    // For paused jobs, endTime is used as the "paused at" timestamp.
     if (job.status !== 'analyzing' && job.endTime) {
       const age = now - job.endTime;
       if (age > maxAge) {
@@ -167,6 +230,9 @@ module.exports = {
   getAnalysisJob,
   updateAnalysisProgress,
   completeAnalysisJob,
+  markJobPaused,
+  resumePausedJob,
+  findRecentResumableJobByUrl,
   cancelAnalysisJob,
   failAnalysisJob,
   deleteAnalysisJob,

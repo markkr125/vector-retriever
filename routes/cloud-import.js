@@ -6,12 +6,57 @@ const {
   getAnalysisJob,
   updateAnalysisProgress,
   completeAnalysisJob,
+  markJobPaused,
+  resumePausedJob,
+  findRecentResumableJobByUrl,
   cancelAnalysisJob,
   failAnalysisJob
 } = require('../state/analysis-jobs');
 
 function createCloudImportRoutes({ collectionMiddleware, documentService, embeddingService, categorizationService, PIIDetectorFactory, uploadJobs }) {
   const router = express.Router();
+
+  function startAnalysisWorker(job) {
+    // Start analysis in background
+    (async () => {
+      try {
+        const options = {
+          onProgress: (progress) => {
+            updateAnalysisProgress(job.jobId, progress);
+          },
+          abortSignal: job.abortController.signal,
+          resumeFromContinuationToken: job.s3ContinuationToken || null,
+          resumeFromPageToken: job.gdrivePageToken || null
+        };
+
+        let analysis;
+        if (job.provider === 's3') {
+          analysis = await cloudImportService.analyzeS3Folder(job.url, options);
+        } else if (job.provider === 'gdrive') {
+          analysis = await cloudImportService.analyzeGoogleDriveFolder(job.url, options);
+        }
+
+        // Mark job as completed
+        completeAnalysisJob(job.jobId, analysis.files, analysis.totalSize, analysis.fileTypes);
+      } catch (error) {
+        const aborted = isAbortError(error) || job.abortController?.signal?.aborted;
+
+        if (aborted) {
+          // If the request was paused/cancelled mid-flight, keep that status.
+          if (job.status === 'paused' || job.status === 'cancelled') {
+            return;
+          }
+
+          // Default abort semantics (older behavior)
+          cancelAnalysisJob(job.jobId);
+          return;
+        }
+
+        console.error(`Analysis job ${job.jobId} failed:`, error);
+        failAnalysisJob(job.jobId, error);
+      }
+    })();
+  }
 
   function extractS3BucketFromUrl(url) {
     if (!url || typeof url !== 'string') return null;
@@ -58,42 +103,24 @@ function createCloudImportRoutes({ collectionMiddleware, documentService, embedd
         return res.status(400).json({ error: 'Invalid provider. Must be "s3" or "gdrive"' });
       }
 
-      // Create analysis job
-      const job = createAnalysisJob(provider, url);
-
-      // Start analysis in background
-      (async () => {
-        try {
-          const options = {
-            onProgress: (progress) => {
-              updateAnalysisProgress(job.jobId, progress);
-            },
-            abortSignal: job.abortController.signal
-          };
-
-          let analysis;
-          if (provider === 's3') {
-            analysis = await cloudImportService.analyzeS3Folder(url, options);
-          } else if (provider === 'gdrive') {
-            analysis = await cloudImportService.analyzeGoogleDriveFolder(url, options);
-          }
-
-          // Mark job as completed
-          completeAnalysisJob(job.jobId, analysis.files, analysis.totalSize, analysis.fileTypes);
-        } catch (error) {
-          const aborted = isAbortError(error) || job.abortController?.signal?.aborted || job.status === 'cancelled';
-          if (aborted) {
-            // If the request was cancelled mid-flight, keep the job cancelled.
-            if (job.status !== 'cancelled') {
-              cancelAnalysisJob(job.jobId);
-            }
-            return;
-          }
-
-          console.error(`Analysis job ${job.jobId} failed:`, error);
-          failAnalysisJob(job.jobId, error);
+      // Reuse paused/analyzing job if available (same provider+url, within TTL)
+      const existing = findRecentResumableJobByUrl(provider, url);
+      if (existing) {
+        if (existing.status === 'paused') {
+          resumePausedJob(existing.jobId);
+          startAnalysisWorker(existing);
+          return res.json({ jobId: existing.jobId, status: 'analyzing', resumed: true });
         }
-      })();
+
+        // Already analyzing; just attach
+        if (existing.status === 'analyzing') {
+          return res.json({ jobId: existing.jobId, status: 'analyzing', resumed: false });
+        }
+      }
+
+      // Create new analysis job
+      const job = createAnalysisJob(provider, url);
+      startAnalysisWorker(job);
 
       // Return jobId immediately
       res.json({
@@ -107,12 +134,43 @@ function createCloudImportRoutes({ collectionMiddleware, documentService, embedd
   });
 
   /**
+   * GET /api/cloud-import/analysis-jobs/by-url?provider=s3|gdrive&url=...
+   * Returns a resumable (paused or in-flight) analysis job for the same URL within TTL.
+   */
+  router.get('/analysis-jobs/by-url', (req, res) => {
+    const { provider, url } = req.query;
+    if (!provider || !url) {
+      return res.status(400).json({ error: 'provider and url are required' });
+    }
+
+    const job = findRecentResumableJobByUrl(String(provider), String(url));
+    if (!job) {
+      return res.json({ found: false });
+    }
+
+    res.json({
+      found: true,
+      jobId: job.jobId,
+      status: job.status,
+      provider: job.provider,
+      url: job.url,
+      filesDiscovered: job.filesDiscovered,
+      totalSize: job.totalSize,
+      fileTypes: job.fileTypes,
+      pagesProcessed: job.pagesProcessed,
+      startTime: job.startTime,
+      endTime: job.endTime
+    });
+  });
+
+  /**
    * GET /api/cloud-import/analysis-jobs/:jobId
    * Get analysis job status and progress
    */
   router.get('/analysis-jobs/:jobId', (req, res) => {
     const { jobId } = req.params;
     const job = getAnalysisJob(jobId);
+    const includeFiles = req.query.includeFiles === '1' || req.query.includeFiles === 'true';
 
     if (!job) {
       return res.status(404).json({ error: 'Analysis job not found' });
@@ -128,11 +186,31 @@ function createCloudImportRoutes({ collectionMiddleware, documentService, embedd
       totalSize: job.totalSize,
       fileTypes: job.fileTypes,
       pagesProcessed: job.pagesProcessed,
-      files: job.status === 'completed' ? job.files : undefined,
+      files: job.status === 'completed' ? job.files : (includeFiles && job.status === 'paused' ? job.files : undefined),
       error: job.error,
       startTime: job.startTime,
       endTime: job.endTime
     });
+  });
+
+  /**
+   * POST /api/cloud-import/analysis-jobs/:jobId/pause
+   * Pause a running analysis job (keep partial results and allow resume).
+   */
+  router.post('/analysis-jobs/:jobId/pause', (req, res) => {
+    const { jobId } = req.params;
+    const job = getAnalysisJob(jobId);
+
+    if (!job) {
+      return res.status(404).json({ error: 'Analysis job not found' });
+    }
+
+    if (job.status !== 'analyzing') {
+      return res.status(400).json({ error: 'Job is not running' });
+    }
+
+    markJobPaused(jobId);
+    res.json({ jobId, status: 'paused' });
   });
 
   /**

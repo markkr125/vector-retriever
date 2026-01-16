@@ -77,7 +77,7 @@ function parseS3Url(url) {
  * @param {string} retryRegion - Region to retry with (internal)
  */
 async function analyzeS3Folder(s3Url, options = {}, retryRegion = null) {
-  const { onProgress, abortSignal } = options;
+  const { onProgress, abortSignal, resumeFromContinuationToken } = options;
   const { bucket, prefix, region } = parseS3Url(s3Url);
 
   // Use retry region if provided, otherwise parsed region, otherwise default
@@ -95,7 +95,7 @@ async function analyzeS3Folder(s3Url, options = {}, retryRegion = null) {
   });
 
   const files = [];
-  let continuationToken = null;
+  let continuationToken = resumeFromContinuationToken || null;
   let totalSize = 0;
   const fileTypes = {};
   let pagesProcessed = 0;
@@ -115,6 +115,9 @@ async function analyzeS3Folder(s3Url, options = {}, retryRegion = null) {
       });
 
       const response = await s3Client.send(command);
+
+      // Save cursor for resume (next continuation token)
+      continuationToken = response.NextContinuationToken || null;
 
       if (response.Contents) {
         for (const item of response.Contents) {
@@ -137,8 +140,6 @@ async function analyzeS3Folder(s3Url, options = {}, retryRegion = null) {
           fileTypes[fileExt] = (fileTypes[fileExt] || 0) + 1;
         }
       }
-
-      continuationToken = response.NextContinuationToken;
       pagesProcessed++;
 
       // Report progress after each page
@@ -147,7 +148,9 @@ async function analyzeS3Folder(s3Url, options = {}, retryRegion = null) {
           filesDiscovered: files.length,
           totalSize,
           fileTypes,
-          pagesProcessed
+          pagesProcessed,
+          s3ContinuationToken: continuationToken,
+          files: files
         });
       }
 
@@ -160,6 +163,7 @@ async function analyzeS3Folder(s3Url, options = {}, retryRegion = null) {
       totalFiles: files.length,
       totalSize,
       fileTypes,
+      s3ContinuationToken: continuationToken,
       files
     };
 
@@ -258,7 +262,7 @@ async function analyzeGoogleDriveFolder(shareLink, options = {}) {
     throw new Error('Google Drive API key not configured. Set GOOGLE_DRIVE_API_KEY in .env');
   }
 
-  const { onProgress, abortSignal } = options;
+  const { onProgress, abortSignal, resumeFromPageToken } = options;
   const folderId = parseGoogleDriveFolderUrl(shareLink);
 
   // Initialize Google Drive API with API key
@@ -270,7 +274,7 @@ async function analyzeGoogleDriveFolder(shareLink, options = {}) {
   const files = [];
   let totalSize = 0;
   const fileTypes = {};
-  let pageToken = null;
+  let pageToken = resumeFromPageToken || null;
   let pagesProcessed = 0;
 
   try {
@@ -323,7 +327,9 @@ async function analyzeGoogleDriveFolder(shareLink, options = {}) {
           filesDiscovered: files.length,
           totalSize,
           fileTypes,
-          pagesProcessed
+          pagesProcessed,
+          gdrivePageToken: pageToken || null,
+          files: files
         });
       }
 
@@ -335,6 +341,7 @@ async function analyzeGoogleDriveFolder(shareLink, options = {}) {
       totalFiles: files.length,
       totalSize,
       fileTypes,
+      gdrivePageToken: pageToken || null,
       files
     };
 

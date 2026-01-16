@@ -135,7 +135,8 @@
               class="btn btn-primary"
               style="width: 100%; margin-bottom: 1rem;"
             >
-              🔍 Analyze Folder
+              <span v-if="resumableAnalysis && resumableAnalysis.status === 'paused'">▶️ Continue Analysis</span>
+              <span v-else>🔍 Analyze Folder</span>
             </button>
 
             <!-- Analysis Results -->
@@ -462,7 +463,7 @@ Or just plain text for unstructured documents."
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import api from '../api'
 import AnalysisProgressModal from './AnalysisProgressModal.vue'
 import FileSelector from './FileSelector.vue'
@@ -489,6 +490,7 @@ const cloudUrl = ref('')
 const showAnalysisProgress = ref(false)
 const analysisJobId = ref(null)
 const folderAnalysis = ref(null)
+const resumableAnalysis = ref(null)
 const importOption = ref('first')
 const importLimit = ref(10)
 const maxCloudImportDocs = ref(1000)
@@ -551,6 +553,32 @@ const clearAnalysis = () => {
   folderAnalysis.value = null
   selectedCloudFiles.value = []
   cloudErrorMessage.value = ''
+  resumableAnalysis.value = null
+}
+
+let resumableLookupTimer = null
+const lookupResumableAnalysis = () => {
+  if (resumableLookupTimer) {
+    clearTimeout(resumableLookupTimer)
+    resumableLookupTimer = null
+  }
+
+  if (!cloudUrl.value || !cloudProvider.value) {
+    resumableAnalysis.value = null
+    return
+  }
+
+  // Debounce to avoid spamming while typing.
+  resumableLookupTimer = setTimeout(async () => {
+    try {
+      const response = await api.get('/cloud-import/analysis-jobs/by-url', {
+        params: { provider: cloudProvider.value, url: cloudUrl.value }
+      })
+      resumableAnalysis.value = response.data?.found ? response.data : null
+    } catch (error) {
+      resumableAnalysis.value = null
+    }
+  }, 350)
 }
 
 const analyzeFolder = async () => {
@@ -567,6 +595,7 @@ const analyzeFolder = async () => {
     // Store job ID and show progress modal
     analysisJobId.value = response.data.jobId
     showAnalysisProgress.value = true
+    resumableAnalysis.value = null
   } catch (error) {
     console.error('Folder analysis error:', error)
     cloudErrorMessage.value = error.response?.data?.error || error.message || 'Failed to start analysis'
@@ -587,6 +616,11 @@ const handleAnalysisComplete = (result) => {
   
   importOption.value = 'first' // Default to first files
   showAnalysisProgress.value = false
+
+  // If the modal completed due to pause, mark resumable.
+  if (result.paused) {
+    resumableAnalysis.value = { found: true, jobId: analysisJobId.value, status: 'paused' }
+  }
 }
 
 const handleAnalysisClose = () => {
@@ -596,6 +630,7 @@ const handleAnalysisClose = () => {
 const handleAnalysisCancelled = () => {
   showAnalysisProgress.value = false
   cloudErrorMessage.value = 'Analysis was cancelled'
+  resumableAnalysis.value = null
 }
 
 const handleFileSelection = (files) => {
@@ -655,6 +690,11 @@ const getS3PrefixFromUrl = (url) => {
 
 onMounted(() => {
   fetchConfig()
+})
+
+// When URL/provider changes, check if a paused job exists to allow "Continue Analysis".
+watch([cloudUrl, cloudProvider], () => {
+  lookupResumableAnalysis()
 })
 
 const handleFileSelect = (event) => {

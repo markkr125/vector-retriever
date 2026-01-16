@@ -69,16 +69,32 @@
           <span class="cancelled-icon">🛑</span>
           <span>Analysis cancelled</span>
         </div>
+
+        <!-- Paused Message -->
+        <div v-if="job.status === 'paused'" class="paused-message">
+          <span class="paused-icon">⏸️</span>
+          <span>
+            Analysis paused. You can close now and continue later from where you left off.
+          </span>
+        </div>
       </div>
 
       <div class="analysis-footer">
-        <button
-          v-if="job.status === 'analyzing'"
-          @click="handleCancel"
-          class="cancel-btn"
-        >
-          🛑 Cancel Analysis
-        </button>
+        <div v-if="job.status === 'analyzing'" class="analysis-actions">
+          <button
+            @click="handlePause"
+            class="pause-btn"
+            :disabled="isPausing"
+          >
+            ⏸️ Pause & Use Current Results
+          </button>
+          <button
+            @click="handleCancel"
+            class="cancel-btn"
+          >
+            🛑 Cancel Analysis
+          </button>
+        </div>
         <button
           v-else
           @click="handleClose"
@@ -114,6 +130,7 @@ const job = ref({
 })
 
 const animatedFilesCount = ref(0)
+const isPausing = ref(false)
 let pollingInterval = null
 
 const providerName = computed(() => {
@@ -216,6 +233,9 @@ async function pollJobStatus() {
     } else if (newJob.status === 'cancelled') {
       stopPolling()
       emit('cancelled')
+    } else if (newJob.status === 'paused') {
+      // Stop polling; parent will decide whether to resume later.
+      stopPolling()
     } else if (newJob.status === 'error') {
       stopPolling()
     }
@@ -224,6 +244,39 @@ async function pollJobStatus() {
     stopPolling()
     job.value.status = 'error'
     job.value.error = error.response?.data?.error || error.message || 'Failed to get analysis status'
+  }
+}
+
+async function handlePause() {
+  if (!props.jobId) return
+
+  if (!confirm('Pause analysis now and use the files discovered so far? You can continue later.')) {
+    return
+  }
+
+  isPausing.value = true
+
+  try {
+    await api.post(`/cloud-import/analysis-jobs/${props.jobId}/pause`)
+
+    // Fetch job with partial file list so parent can show Folder Analysis.
+    const response = await api.get(`/cloud-import/analysis-jobs/${props.jobId}?includeFiles=1`)
+    job.value = response.data
+
+    stopPolling()
+
+    emit('complete', {
+      provider: job.value.provider,
+      files: job.value.files || [],
+      totalSize: job.value.totalSize,
+      fileTypes: job.value.fileTypes,
+      paused: true
+    })
+  } catch (error) {
+    console.error('Error pausing analysis:', error)
+    alert('Failed to pause analysis: ' + (error.response?.data?.error || error.message))
+  } finally {
+    isPausing.value = false
   }
 }
 
