@@ -121,6 +121,27 @@ Welcome to the Vector Retriever documentation! This folder contains comprehensiv
 
 ---
 
+### [Cloud Import Feature](CLOUD_IMPORT.md)
+**Import documents from S3 / Google Drive**
+- Folder analysis with live stats (file count, size, types)
+- Pause & resume analysis (by URL within TTL)
+- Selective import with filtering, folder navigation, and path visibility
+- Uses the same processing pipeline as regular uploads
+
+**Best for:** Using and extending cloud import (UI + API).
+
+---
+
+### [Cloud Import Safety Limits](CLOUD_IMPORT_LIMITS.md)
+**Guardrails for large imports**
+- Max-doc and max-size limits
+- Confirmation dialogs and UX patterns
+- Testing guidance
+
+**Best for:** Understanding safety constraints and UX limits.
+
+---
+
 ### [Testing Plan](TESTING_PLAN.md)
 **Testing strategy and roadmap**
 - Test stack choices (Jest/Vitest/Playwright)

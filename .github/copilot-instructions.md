@@ -446,6 +446,11 @@ uploadJobs.set(jobId, {
   - Symptom if missing: file-type dropdown shows only “All Types”.
 - `FileSelector.vue` supports real folder navigation (breadcrumbs + folder rows). For S3, pass `rootPrefix` so the breadcrumb/path display is relative to the analyzed prefix.
 
+**File Selector Global Filter Mode:**
+- When search/type/size filters are active, `FileSelector.vue` switches to *global filtering* across all discovered files (not folder-scoped).
+- In that mode, folder rows are hidden and each file row should display its folder path (derived from `key` and `rootPrefix`) so users can see where matches live.
+- `availableTypes` should be derived from the full file list (not just the current folder) to avoid an empty type dropdown at Root when Root contains only subfolders.
+
 **Stage Reporting (Current Action):**
 - `services/document-service.js` supports `options.onStage(stageLabel)` to report major steps (PII scan, categorization, embedding, saving)
 - Upload/cloud-import workers pass `onStage` to update `job.currentStage` so the UI can display a second line under “Processing: <file>”
@@ -476,6 +481,22 @@ Combines timestamp + auto-incrementing counter for uniqueness.
 **Abortable Ollama Calls (Option C):**
 - Shared helper: `services/ollama-agent.js` (`runOllamaChat`) centralizes AbortSignal + JSONL stream collection.
 - Services that call `/api/chat` should use `runOllamaChat({ ..., signal })` instead of duplicating axios streaming logic.
+
+### Cloud Analysis Pause/Resume Pattern
+Cloud folder analysis (S3 / Google Drive) supports pause/resume within a short TTL.
+
+- Server state is stored in-memory in `state/analysis-jobs.js` and is not crash-resistant.
+- Pause uses `AbortController.abort()` and sets `job.status='paused'`.
+- Resume reuses the same job and cursor token (S3 continuation token / Drive page token).
+- Important: preserve accumulated stats across resume.
+  - Pass prior `files`, `totalSize`, `fileTypes`, `pagesProcessed` into the analyzer and keep accumulating.
+  - Otherwise, `fileTypes` can appear to “disappear” right after clicking Continue.
+
+### Playwright Mocking Gotcha (Collections)
+The Axios interceptor automatically appends `?collection=...` to API requests.
+
+- When mocking routes in Playwright, match query params too (e.g. `**/pause*` not `**/pause`).
+- Symptom if missed: test waits forever for a mocked response that never matches.
 
 ### Pagination Pattern
 **Frontend** (`ResultsList.vue`):

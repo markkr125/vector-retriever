@@ -6,6 +6,7 @@ Import documents directly from cloud storage providers (AWS S3, Google Drive) in
 - [Overview](#overview)
 - [Supported Providers](#supported-providers)
 - [Getting Started](#getting-started)
+- [Pause & Resume Analysis](#pause--resume-analysis)
 - [AWS S3 Import](#aws-s3-import)
 - [Google Drive Import](#google-drive-import)
 - [Import Options](#import-options)
@@ -54,11 +55,34 @@ In the web UI:
 
 1. Enter your cloud storage URL
 2. Click **"🔍 Analyze Folder"**
-3. (Optional) Click **"Cancel"** to stop analysis mid-flight
-3. Review folder statistics:
+3. (Optional) Click **"⏸️ Pause & Use Current Results"** to stop early and use partial results
+4. (Optional) Click **"🛑 Cancel Analysis"** to stop and discard progress
+5. Review folder statistics:
    - Total files
    - Total size
    - File type breakdown
+
+**Note:** Analysis runs as a background job and streams progress into the modal. It does not block the UI.
+
+## Pause & Resume Analysis
+
+Long-running folder analysis supports pausing and resuming from the last cursor.
+
+**What pausing does**
+- Stops the analysis worker via `AbortController`.
+- Keeps partial counts and discovered files in memory (server-side) so the UI can proceed.
+- Leaves a resumable job that can be continued shortly after.
+
+**What resuming does**
+- Reuses the same analysis job ID.
+- Continues listing from the last cursor token:
+   - S3: `NextContinuationToken`
+   - Google Drive: `nextPageToken`
+- Preserves previously accumulated stats (e.g. `fileTypes`) so the UI does not “forget” what it already found.
+
+**TTL / persistence**
+- Resume works for the same provider+URL within ~5–10 minutes.
+- Resume state is in-memory only (server restart clears it).
 
 ### 3. Choose Import Option
 
@@ -236,7 +260,12 @@ For providers that return full paths (like S3 keys), the file selector supports 
 - Breadcrumbs show the current folder path
 - Folder rows let you drill down without losing selections
 - Selections persist when you move between folders
-- Search/type/size filters apply within the current folder view
+
+**Filters + folder navigation**
+- When no filters are active, search is scoped to the current folder (breadcrumb navigation mode).
+- When a filter is active (search/type/size), the file list switches to a *global filter mode* across all discovered files.
+   - Folder rows are hidden (to avoid mixing "global search" with folder browsing).
+   - Each file row shows its folder path so you can still see where it lives.
 
 This avoids the confusion of paging through a single flat, recursive list when your dataset has many nested folders.
 
@@ -281,6 +310,7 @@ This avoids the confusion of paging through a single flat, recursive list when y
 
 Each file shows:
 - 📄 **Filename** (truncated if long)
+- 📁 **Folder path** (shown when using global filter mode)
 - 🏷️ **Extension** (uppercase badge)
 - 📊 **Size** (human-readable format)
 - 📅 **Last Modified** (if available)
@@ -425,25 +455,72 @@ If `DESCRIPTION_MODEL` set:
 **Response**:
 ```json
 {
-  "provider": "s3",
-  "bucket": "bucket",
-  "prefix": "folder/",
-  "totalFiles": 127,
-  "totalSize": 47453184,
-  "fileTypes": {
-    ".pdf": 98,
-    ".txt": 24,
-    ".docx": 5
-  },
-  "files": [
-    {
-      "key": "folder/document1.pdf",
-      "name": "document1.pdf",
-      "size": 12345678,
-      "lastModified": "2024-01-15T10:30:00Z",
-      "extension": ".pdf"
-    }
-  ]
+   "jobId": "analysis_1704461234567_0",
+   "status": "analyzing",
+   "resumed": false
+}
+```
+
+### Get Analysis Job Status
+
+**Endpoint**: `GET /api/cloud-import/analysis-jobs/:jobId`
+
+**Response (analyzing)**:
+```json
+{
+   "jobId": "analysis_1704461234567_0",
+   "status": "analyzing",
+   "provider": "s3",
+   "url": "https://bucket.s3.amazonaws.com/folder/",
+   "filesDiscovered": 40900,
+   "totalSize": 2000000000,
+   "fileTypes": { ".jpg": 43000 },
+   "pagesProcessed": 43,
+   "startTime": 1704461234567,
+   "endTime": null
+}
+```
+
+**Response (completed)** returns `files`:
+```json
+{
+   "jobId": "analysis_1704461234567_0",
+   "status": "completed",
+   "files": [
+      { "key": "folder/document1.pdf", "name": "document1.pdf", "size": 12345, "extension": ".pdf" }
+   ]
+}
+```
+
+### Pause Analysis Job
+
+**Endpoint**: `POST /api/cloud-import/analysis-jobs/:jobId/pause`
+
+**Response**:
+```json
+{ "jobId": "analysis_1704461234567_0", "status": "paused" }
+```
+
+### Fetch Paused Job With Partial File List
+
+When paused, the job status endpoint omits `files` by default (to keep polling light). Request the partial file list explicitly:
+
+**Endpoint**: `GET /api/cloud-import/analysis-jobs/:jobId?includeFiles=1`
+
+### Find Resumable Job By URL
+
+Used by the UI to enable **"▶️ Continue Analysis"** when the same URL is re-entered soon after pausing.
+
+**Endpoint**: `GET /api/cloud-import/analysis-jobs/by-url?provider=s3|gdrive&url=...`
+
+**Response**:
+```json
+{
+   "found": true,
+   "jobId": "analysis_1704461234567_0",
+   "status": "paused",
+   "filesDiscovered": 40900,
+   "fileTypes": { ".jpg": 43000 }
 }
 ```
 
