@@ -123,6 +123,30 @@ The backend was refactored from a single large `server.js` into:
 
 Entry behavior is unchanged: `npm run server` runs `server.js`.
 
+### JavaScript Configuration (jsconfig.json)
+**Purpose:** Root-level `jsconfig.json` configures IDE tooling (Vetur, IntelliSense, ESLint):
+- **Path aliases**: Maps `@` to `web-ui/src/` for imports like `import api from '@/api'`
+- **IntelliSense**: Enables auto-completion and code navigation
+- **Project structure**: Tells VS Code which files to include/exclude
+- **Type checking**: Lightweight JavaScript type inference
+
+**When to update:**
+- Adding new path aliases in Vite config
+- Restructuring major directories
+- Adding new file types that need IntelliSense support
+
+**Configuration:**
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": { "@/*": ["web-ui/src/*"] }
+  },
+  "include": ["web-ui/src/**/*", "*.js", "routes/**/*.js", ...],
+  "exclude": ["node_modules", "dist", "__tests__", ...]
+}
+```
+
 ### Vue Component CSS Organization
 **CRITICAL:** All Vue components MUST have CSS in separate files, not inline `<style>` blocks.
 

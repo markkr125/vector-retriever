@@ -120,7 +120,7 @@
 
           <div
             v-for="file in paginatedFiles"
-            :key="file.key"
+            :key="getFileIdentity(file)"
             class="file-item"
             :class="{ selected: isSelected(file) }"
             @click="toggleFile(file)"
@@ -352,12 +352,26 @@ const selectedTotalSize = computed(() => {
 })
 
 // Methods
+const getFileIdentity = (file) => {
+  const direct = file?.key ?? file?.id ?? file?.url
+  if (direct !== undefined && direct !== null && String(direct).length > 0) {
+    return String(direct)
+  }
+
+  const name = file?.name ?? ''
+  const size = typeof file?.size === 'number' ? file.size : parseInt(file?.size || 0, 10)
+  const lastModified = file?.lastModified ?? ''
+  return `${name}|${size}|${lastModified}`
+}
+
 const isSelected = (file) => {
-  return selectedFiles.value.some(f => f.key === file.key)
+  const id = getFileIdentity(file)
+  return selectedFiles.value.some(f => getFileIdentity(f) === id)
 }
 
 const toggleFile = (file) => {
-  const index = selectedFiles.value.findIndex(f => f.key === file.key)
+  const id = getFileIdentity(file)
+  const index = selectedFiles.value.findIndex(f => getFileIdentity(f) === id)
   if (index >= 0) {
     selectedFiles.value.splice(index, 1)
   } else {

@@ -81,6 +81,15 @@ function createCloudImportRoutes({ collectionMiddleware, documentService, embedd
           // Mark job as completed
           completeAnalysisJob(job.jobId, analysis.files, analysis.totalSize, analysis.fileTypes);
         } catch (error) {
+          const aborted = isAbortError(error) || job.abortController?.signal?.aborted || job.status === 'cancelled';
+          if (aborted) {
+            // If the request was cancelled mid-flight, keep the job cancelled.
+            if (job.status !== 'cancelled') {
+              cancelAnalysisJob(job.jobId);
+            }
+            return;
+          }
+
           console.error(`Analysis job ${job.jobId} failed:`, error);
           failAnalysisJob(job.jobId, error);
         }

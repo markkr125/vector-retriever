@@ -13,6 +13,23 @@ function isGoogleDriveEnabled() {
   return !!process.env.GOOGLE_DRIVE_API_KEY;
 }
 
+  function extractGoogleApiErrorDetails(error) {
+    const status =
+      (typeof error?.code === 'number' ? error.code : null) ??
+      (typeof error?.response?.status === 'number' ? error.response.status : null);
+
+    const apiError = error?.response?.data?.error;
+    const first = Array.isArray(apiError?.errors) ? apiError.errors[0] : null;
+
+    return {
+      status,
+      reason: first?.reason || null,
+      domain: first?.domain || null,
+      message: first?.message || apiError?.message || error?.message || String(error),
+      extendedHelp: first?.extendedHelp || null
+    };
+  }
+
 /**
  * Parse S3 URL into bucket and prefix
  * Supports formats:
@@ -324,15 +341,31 @@ async function analyzeGoogleDriveFolder(shareLink, options = {}) {
   } catch (error) {
     console.error('Google Drive analysis error:', error);
     
-    if (error.code === 404) {
-      throw new Error('Google Drive folder not found. Make sure the folder is publicly accessible.');
-    } else if (error.code === 403) {
-      throw new Error('Access denied. Folder must be shared as "Anyone with the link can view".');
-    } else if (error.message.includes('API key')) {
+    const details = extractGoogleApiErrorDetails(error);
+
+    if (details.status === 404) {
+      throw new Error('Google Drive folder not found. Make sure the folder exists and the URL is correct.');
+    }
+
+    // Google can return 403 for many reasons; distinguish API-disabled from permissions.
+    if (details.status === 403 && details.reason === 'accessNotConfigured') {
+      throw new Error(
+        `Google Drive API is not enabled for your Google Cloud project (accessNotConfigured). ` +
+          `Enable the Drive API in Google Cloud Console and retry. Details: ${details.message}`
+      );
+    }
+
+    if (details.status === 403) {
+      throw new Error(
+        'Access denied. Folder must be shared as "Anyone with the link can view" (or your API key must have access).'
+      );
+    }
+
+    if ((details.message || '').toLowerCase().includes('api key')) {
       throw new Error('Invalid Google Drive API key. Check your GOOGLE_DRIVE_API_KEY environment variable.');
     }
-    
-    throw new Error(`Failed to analyze Google Drive folder: ${error.message}`);
+
+    throw new Error(`Failed to analyze Google Drive folder: ${details.message}`);
   }
 }
 
@@ -363,11 +396,20 @@ async function downloadGoogleDriveFile(fileInfo) {
   } catch (error) {
     console.error(`Failed to download ${fileInfo.name}:`, error);
     
-    if (error.code === 403) {
+    const details = extractGoogleApiErrorDetails(error);
+
+    if (details.status === 403 && details.reason === 'accessNotConfigured') {
+      throw new Error(
+        `Google Drive API is not enabled for your Google Cloud project (accessNotConfigured). ` +
+          `Enable the Drive API in Google Cloud Console and retry. Details: ${details.message}`
+      );
+    }
+
+    if (details.status === 403) {
       throw new Error(`Access denied for file ${fileInfo.name}. File must be publicly accessible.`);
     }
-    
-    throw new Error(`Failed to download file: ${error.message}`);
+
+    throw new Error(`Failed to download file: ${details.message}`);
   }
 }
 
