@@ -1,0 +1,370 @@
+const express = require('express');
+const cloudImportService = require('../services/cloud-import-service');
+const { isAbortError } = require('../services/ollama-agent');
+const { processCloudImport } = require('../services/cloud-import-worker');
+const {
+  createAnalysisJob,
+  getAnalysisJob,
+  updateAnalysisProgress,
+  completeAnalysisJob,
+  markJobPaused,
+  resumePausedJob,
+  findRecentResumableJobByUrl,
+  cancelAnalysisJob,
+  failAnalysisJob
+} = require('../state/analysis-jobs');
+
+function createCloudImportRoutes({ collectionMiddleware, documentService, embeddingService, categorizationService, PIIDetectorFactory, uploadJobs }) {
+  const router = express.Router();
+
+  function startAnalysisWorker(job) {
+    // Start analysis in background
+    (async () => {
+      try {
+        const options = {
+          onProgress: (progress) => {
+            updateAnalysisProgress(job.jobId, progress);
+          },
+          abortSignal: job.abortController.signal,
+          resumeFromContinuationToken: job.s3ContinuationToken || null,
+          resumeFromPageToken: job.gdrivePageToken || null,
+          // Preserve previously accumulated stats on resume.
+          resumeFiles: Array.isArray(job.files) ? job.files : [],
+          resumeTotalSize: typeof job.totalSize === 'number' ? job.totalSize : 0,
+          resumeFileTypes: job.fileTypes && typeof job.fileTypes === 'object' ? job.fileTypes : {},
+          resumePagesProcessed: typeof job.pagesProcessed === 'number' ? job.pagesProcessed : 0
+        };
+
+        let analysis;
+        if (job.provider === 's3') {
+          analysis = await cloudImportService.analyzeS3Folder(job.url, options);
+        } else if (job.provider === 'gdrive') {
+          analysis = await cloudImportService.analyzeGoogleDriveFolder(job.url, options);
+        }
+
+        // Mark job as completed
+        completeAnalysisJob(job.jobId, analysis.files, analysis.totalSize, analysis.fileTypes);
+      } catch (error) {
+        const aborted = isAbortError(error) || job.abortController?.signal?.aborted;
+
+        if (aborted) {
+          // If the request was paused/cancelled mid-flight, keep that status.
+          if (job.status === 'paused' || job.status === 'cancelled') {
+            return;
+          }
+
+          // Default abort semantics (older behavior)
+          cancelAnalysisJob(job.jobId);
+          return;
+        }
+
+        console.error(`Analysis job ${job.jobId} failed:`, error);
+        failAnalysisJob(job.jobId, error);
+      }
+    })();
+  }
+
+  function extractS3BucketFromUrl(url) {
+    if (!url || typeof url !== 'string') return null;
+    if (url.startsWith('s3://')) {
+      const match = url.match(/^s3:\/\/([^\/]+)/);
+      return match ? match[1] : null;
+    }
+
+    const match = url.match(/^https?:\/\/([^.]+)\.s3(?:[.-][^.]+)?\.amazonaws\.com\//);
+    return match ? match[1] : null;
+  }
+
+  /**
+   * GET /api/cloud-import/providers
+   * Returns available cloud providers and their enabled status
+   */
+  router.get('/providers', (req, res) => {
+    res.json({
+      s3: {
+        enabled: true,
+        requiresAuth: false
+      },
+      gdrive: {
+        enabled: cloudImportService.isGoogleDriveEnabled(),
+        requiresAuth: true
+      }
+    });
+  });
+
+  /**
+   * POST /api/cloud-import/analyze
+   * Starts a cloud folder analysis job and returns jobId immediately
+   * Body: { provider: 's3'|'gdrive', url: 'folder_url' }
+   */
+  router.post('/analyze', async (req, res) => {
+    try {
+      const { provider, url } = req.body;
+
+      if (!provider || !url) {
+        return res.status(400).json({ error: 'Provider and URL are required' });
+      }
+
+      if (provider !== 's3' && provider !== 'gdrive') {
+        return res.status(400).json({ error: 'Invalid provider. Must be "s3" or "gdrive"' });
+      }
+
+      // Reuse paused/analyzing job if available (same provider+url, within TTL)
+      const existing = findRecentResumableJobByUrl(provider, url);
+      if (existing) {
+        if (existing.status === 'paused') {
+          resumePausedJob(existing.jobId);
+          startAnalysisWorker(existing);
+          return res.json({ jobId: existing.jobId, status: 'analyzing', resumed: true });
+        }
+
+        // Already analyzing; just attach
+        if (existing.status === 'analyzing') {
+          return res.json({ jobId: existing.jobId, status: 'analyzing', resumed: false });
+        }
+      }
+
+      // Create new analysis job
+      const job = createAnalysisJob(provider, url);
+      startAnalysisWorker(job);
+
+      // Return jobId immediately
+      res.json({
+        jobId: job.jobId,
+        status: 'analyzing'
+      });
+    } catch (error) {
+      console.error('Cloud import analysis error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * GET /api/cloud-import/analysis-jobs/by-url?provider=s3|gdrive&url=...
+   * Returns a resumable (paused or in-flight) analysis job for the same URL within TTL.
+   */
+  router.get('/analysis-jobs/by-url', (req, res) => {
+    const { provider, url } = req.query;
+    if (!provider || !url) {
+      return res.status(400).json({ error: 'provider and url are required' });
+    }
+
+    const job = findRecentResumableJobByUrl(String(provider), String(url));
+    if (!job) {
+      return res.json({ found: false });
+    }
+
+    res.json({
+      found: true,
+      jobId: job.jobId,
+      status: job.status,
+      provider: job.provider,
+      url: job.url,
+      filesDiscovered: job.filesDiscovered,
+      totalSize: job.totalSize,
+      fileTypes: job.fileTypes,
+      pagesProcessed: job.pagesProcessed,
+      startTime: job.startTime,
+      endTime: job.endTime
+    });
+  });
+
+  /**
+   * GET /api/cloud-import/analysis-jobs/:jobId
+   * Get analysis job status and progress
+   */
+  router.get('/analysis-jobs/:jobId', (req, res) => {
+    const { jobId } = req.params;
+    const job = getAnalysisJob(jobId);
+    const includeFiles = req.query.includeFiles === '1' || req.query.includeFiles === 'true';
+
+    if (!job) {
+      return res.status(404).json({ error: 'Analysis job not found' });
+    }
+
+    // Return progress info (without abortController)
+    res.json({
+      jobId: job.jobId,
+      status: job.status,
+      provider: job.provider,
+      url: job.url,
+      filesDiscovered: job.filesDiscovered,
+      totalSize: job.totalSize,
+      fileTypes: job.fileTypes,
+      pagesProcessed: job.pagesProcessed,
+      files: job.status === 'completed' ? job.files : (includeFiles && job.status === 'paused' ? job.files : undefined),
+      error: job.error,
+      startTime: job.startTime,
+      endTime: job.endTime
+    });
+  });
+
+  /**
+   * POST /api/cloud-import/analysis-jobs/:jobId/pause
+   * Pause a running analysis job (keep partial results and allow resume).
+   */
+  router.post('/analysis-jobs/:jobId/pause', (req, res) => {
+    const { jobId } = req.params;
+    const job = getAnalysisJob(jobId);
+
+    if (!job) {
+      return res.status(404).json({ error: 'Analysis job not found' });
+    }
+
+    if (job.status !== 'analyzing') {
+      return res.status(400).json({ error: 'Job is not running' });
+    }
+
+    markJobPaused(jobId);
+    res.json({ jobId, status: 'paused' });
+  });
+
+  /**
+   * POST /api/cloud-import/analysis-jobs/:jobId/cancel
+   * Cancel a running analysis job
+   */
+  router.post('/analysis-jobs/:jobId/cancel', (req, res) => {
+    const { jobId } = req.params;
+    const job = getAnalysisJob(jobId);
+
+    if (!job) {
+      return res.status(404).json({ error: 'Analysis job not found' });
+    }
+
+    if (job.status !== 'analyzing') {
+      return res.status(400).json({ error: 'Job is not running' });
+    }
+
+    cancelAnalysisJob(jobId);
+
+    res.json({
+      jobId: job.jobId,
+      status: 'cancelled',
+      message: 'Analysis job cancelled successfully'
+    });
+  });
+
+  /**
+   * POST /api/cloud-import/import
+   * Starts a cloud import job
+   * Body: {
+   *   provider: 's3'|'gdrive',
+   *   url: 'folder_url',
+   *   files: 'all' | [{key, name, size, url}],
+   *   autoCategorize: boolean
+   * }
+   */
+  router.post('/import', collectionMiddleware, async (req, res) => {
+    try {
+      const { provider, url, files, autoCategorize, appendToJob } = req.body;
+
+      if (!provider || !url || !files) {
+        return res.status(400).json({ error: 'Provider, URL, and files selection are required' });
+      }
+
+    // Determine which files to import
+    let filesToImport;
+    if (files === 'all') {
+      // Re-analyze to get full file list
+      if (provider === 's3') {
+        const analysis = await cloudImportService.analyzeS3Folder(url);
+        filesToImport = analysis.files;
+      } else if (provider === 'gdrive') {
+        const analysis = await cloudImportService.analyzeGoogleDriveFolder(url);
+        filesToImport = analysis.files;
+      }
+    } else {
+      filesToImport = files;
+    }
+
+    if (!filesToImport || filesToImport.length === 0) {
+      return res.status(400).json({ error: 'No files to import' });
+    }
+
+    // Check if appending to existing job (for batch uploads)
+    let jobId = appendToJob;
+    const { getJob, createJob, updateJobProgress } = require('../state/upload-jobs');
+    
+    if (appendToJob) {
+      // Append to existing job
+      const existingJob = getJob(appendToJob);
+      if (existingJob) {
+        // If a job already finished, allow appending by moving it back to processing
+        if (existingJob.status === 'completed') {
+          existingJob.status = 'processing';
+          existingJob.endTime = null;
+        }
+
+        // Update total files count
+        existingJob.totalFiles += filesToImport.length;
+
+        // Append to processing queue (single worker consumes this)
+        if (!Array.isArray(existingJob.cloudImportQueue)) {
+          existingJob.cloudImportQueue = [];
+        }
+        existingJob.cloudImportQueue.push(...filesToImport);
+
+        // Add new files to the files array
+        for (const file of filesToImport) {
+          existingJob.files.push({
+            name: file.name,
+            status: 'pending',
+            id: null,
+            error: null,
+            bucket: provider === 's3' ? extractS3BucketFromUrl(file.url || url) : null
+          });
+        }
+      } else {
+        return res.status(404).json({ error: 'Job not found for appending' });
+      }
+    } else {
+      // Create new job (createJob generates its own ID)
+      const job = createJob(filesToImport.length);
+      jobId = job.id; // Use the generated ID
+      job.source = 'cloud';
+      job.provider = provider;
+      job.collectionId = req.collectionId;
+      job.qdrantCollection = req.qdrantCollection;
+
+      // Cloud-import worker state
+      job.cloudImportQueue = [...filesToImport];
+      job.cloudImportCursor = 0;
+      job.cloudImportWorkerRunning = false;
+      job.cloudImportAutoCategorize = !!autoCategorize;
+      job.cloudImportUrl = url;
+      
+      // Initialize files array with pending status
+      for (const file of filesToImport) {
+        job.files.push({
+          name: file.name,
+          status: 'pending',
+          id: null,
+          error: null,
+          bucket: provider === 's3' ? extractS3BucketFromUrl(file.url || url) : null
+        });
+      }
+    }
+
+    // Start background processing (don't await)
+    processCloudImport({
+      jobId,
+      documentService  // Pass the already-initialized documentService
+    }).catch(error => {
+      console.error('Cloud import background processing error:', error);
+    });
+
+    res.json({
+      jobId,
+      message: appendToJob ? 'Batch appended to job' : 'Cloud import job started',
+      totalFiles: filesToImport.length
+    });
+  } catch (error) {
+    console.error('Cloud import error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+  return router;
+}
+
+module.exports = { createCloudImportRoutes };

@@ -7,6 +7,7 @@ function generateJobId() {
 
 function createJob(totalFiles) {
   const jobId = generateJobId();
+  const abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const job = {
     id: jobId,
     status: 'processing', // processing, completed, stopped, error
@@ -15,6 +16,8 @@ function createJob(totalFiles) {
     successfulFiles: 0,
     failedFiles: 0,
     currentFile: null,
+    currentStage: null,
+    abortController,
     files: [], // { name, status: 'pending'|'processing'|'success'|'error', error?, id? }
     errors: [],
     startTime: Date.now(),
@@ -24,7 +27,21 @@ function createJob(totalFiles) {
   return job;
 }
 
+function getJob(jobId) {
+  return uploadJobs.get(jobId);
+}
+
+function updateJobProgress(jobId, updates) {
+  const job = uploadJobs.get(jobId);
+  if (job) {
+    Object.assign(job, updates);
+  }
+  return job;
+}
+
 module.exports = {
   uploadJobs,
-  createJob
+  createJob,
+  getJob,
+  updateJobProgress
 };

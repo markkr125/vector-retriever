@@ -193,6 +193,16 @@
   color: var(--text-primary, #111827);
 }
 
+.status-title {
+  margin-bottom: 0.25rem;
+}
+
+.status-detail {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary, #6b7280);
+}
+
 .status-message.completed {
   background: #f0fdf4;
   border-left-color: #10b981;
@@ -209,6 +219,9 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  max-height: 45vh;
+  overflow-y: auto;
+  padding-right: 0.25rem;
 }
 
 .file-item {
@@ -220,6 +233,7 @@
   border-radius: 6px;
   border-left: 3px solid transparent;
   transition: all 0.2s;
+  box-sizing: border-box;
 }
 
 .file-item.success {
@@ -242,6 +256,43 @@
   flex-shrink: 0;
 }
 
+.file-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  overflow: hidden;
+}
+
+.file-title {
+  color: var(--text-primary, #111827);
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  unicode-bidi: plaintext;
+  direction: ltr;
+  text-align: left;
+}
+
+.file-subtitle {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-stage {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.8rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .file-name {
   flex: 1;
   color: var(--text-primary, #111827);
@@ -258,11 +309,10 @@
   color: var(--error, #ef4444);
   font-size: 0.85rem;
   font-style: italic;
-  flex-shrink: 0;
-  max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.2;
 }
 
 .modal-footer {

@@ -7,7 +7,7 @@
 - [Architecture Overview](#architecture-overview)
 - [Critical Developer Workflows](#critical-developer-workflows)
 - [Project-Specific Conventions](#project-specific-conventions)
-- [Express API Endpoints (29 routes)](#express-api-endpoints-29-routes)
+- [Express API Endpoints (30 routes)](#express-api-endpoints-30-routes)
 - [Vue.js UI Architecture](#vuejs-ui-architecture)
 - [Integration Points](#integration-points)
 - [Common Debugging Patterns](#common-debugging-patterns)
@@ -122,6 +122,30 @@ The backend was refactored from a single large `server.js` into:
 - `utils/` - Small pure helpers (sparse vectors, metadata parsing, PDF helpers)
 
 Entry behavior is unchanged: `npm run server` runs `server.js`.
+
+### JavaScript Configuration (jsconfig.json)
+**Purpose:** Root-level `jsconfig.json` configures IDE tooling (Vetur, IntelliSense, ESLint):
+- **Path aliases**: Maps `@` to `web-ui/src/` for imports like `import api from '@/api'`
+- **IntelliSense**: Enables auto-completion and code navigation
+- **Project structure**: Tells VS Code which files to include/exclude
+- **Type checking**: Lightweight JavaScript type inference
+
+**When to update:**
+- Adding new path aliases in Vite config
+- Restructuring major directories
+- Adding new file types that need IntelliSense support
+
+**Configuration:**
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": { "@/*": ["web-ui/src/*"] }
+  },
+  "include": ["web-ui/src/**/*", "*.js", "routes/**/*.js", ...],
+  "exclude": ["node_modules", "dist", "__tests__", ...]
+}
+```
 
 ### Vue Component CSS Organization
 **CRITICAL:** All Vue components MUST have CSS in separate files, not inline `<style>` blocks.
@@ -387,6 +411,7 @@ uploadJobs.set(jobId, {
   successfulFiles: 2,
   failedFiles: 1,
   currentFile: 'document.pdf',  // Currently processing file
+  currentStage: 'Embedding…',   // Current step for active file (UI hint)
   files: [  // File-level tracking with individual status
     { name: 'doc1.pdf', status: 'success', id: 12345 },
     { name: 'doc2.pdf', status: 'processing' },
@@ -404,10 +429,34 @@ uploadJobs.set(jobId, {
 - Polls job status every **1 second** (not 500ms)
 - File icons: ⏱️ pending, ⏳ processing, ✅ success, ❌ error
 - Stop button with confirmation dialog
+- When a job is stopped, show:
+  - **Back** button to return to `UploadModal.vue` without losing cloud-import analysis state
+  - **Resume Upload** button for cloud-import jobs to continue remaining queued files
 - Close button always visible (modal can be closed, upload continues)
-- **No auto-open on refresh** - button shows "Upload in progress..." but modal stays closed
+- **No auto-open on refresh** - header shows "Upload in progress..." only while the job is `processing`; modal stays closed
 - **Polling safeguards**: Uses watchers for `props.show` and `props.jobId` to prevent duplicate intervals
 - `startPolling()` calls `stopPolling()` first to ensure only one interval runs
+
+**Large Job Scaling (50K+ files):**
+- Status polling should be lightweight: `GET /api/upload-jobs/:jobId?filesLimit=0` (avoid returning the file list every second)
+- File list paging: `GET /api/upload-jobs/:jobId/files?offset=0&limit=200` returns `{ filesTotal, offset, limit, files }`
+- UI uses virtual rendering (fixed row height) and fetches pages on scroll; rows are cached by index to avoid re-requesting
+- Scroll fetching is debounced (~150ms) to avoid spamming `/files` during continuous scrolling; in-flight page fetches are abortable via `AbortController`
+
+**Cloud Import File Selection (Subfolders + Types):**
+- Cloud analysis results should include a stable per-file path (`key`/`path`) so the UI can derive folders and display breadcrumbs.
+- Cloud analysis results should include a per-file `extension` field; the file-type dropdown is derived from this.
+  - Symptom if missing: file-type dropdown shows only “All Types”.
+- `FileSelector.vue` supports real folder navigation (breadcrumbs + folder rows). For S3, pass `rootPrefix` so the breadcrumb/path display is relative to the analyzed prefix.
+
+**File Selector Global Filter Mode:**
+- When search/type/size filters are active, `FileSelector.vue` switches to *global filtering* across all discovered files (not folder-scoped).
+- In that mode, folder rows are hidden and each file row should display its folder path (derived from `key` and `rootPrefix`) so users can see where matches live.
+- `availableTypes` should be derived from the full file list (not just the current folder) to avoid an empty type dropdown at Root when Root contains only subfolders.
+
+**Stage Reporting (Current Action):**
+- `services/document-service.js` supports `options.onStage(stageLabel)` to report major steps (PII scan, categorization, embedding, saving)
+- Upload/cloud-import workers pass `onStage` to update `job.currentStage` so the UI can display a second line under “Processing: <file>”
 
 **RTL Text Support:**
 Hebrew and other right-to-left language filenames displayed correctly:
@@ -428,10 +477,37 @@ const generateJobId = () => `job_${Date.now()}_${jobIdCounter++}`;
 Combines timestamp + auto-incrementing counter for uniqueness.
 
 **Stop Behavior:**
-- Current file completes fully (no corruption)
-- Remaining files skipped (never started)
-- Completed files remain in database
-- Job status changes to 'stopped'
+- Each upload job owns an `abortController` (AbortSignal propagated through `documentService.processSingleFile(..., { signal })`).
+- Stop requests set `job.status='stopped'` and call `abortController.abort()` to cancel in-flight Ollama/embedding requests where supported.
+- The current file may be marked as cancelled (surfaced as an error on that file), and remaining files are skipped.
+
+**Resume Behavior (Cloud Import Uploads):**
+- A stopped upload job can be resumed only when it is a cloud-import job with a remaining queue/cursor.
+- API: `POST /api/upload-jobs/:jobId/resume` flips status back to `processing` and restarts the cloud-import worker from its saved cursor/queue.
+- Implementation uses a shared worker module (see `services/cloud-import-worker.js`) so the cloud-import route and resume endpoint reuse identical processing logic.
+
+**Preserving Upload Modal State (Back Button):**
+- To support Back (returning to the upload modal exactly as it was, including analyzed cloud folder state), keep `UploadModal.vue` mounted and toggle visibility (e.g., `v-show` + an `everOpened` flag) instead of destroying it with `v-if`.
+
+**Abortable Ollama Calls (Option C):**
+- Shared helper: `services/ollama-agent.js` (`runOllamaChat`) centralizes AbortSignal + JSONL stream collection.
+- Services that call `/api/chat` should use `runOllamaChat({ ..., signal })` instead of duplicating axios streaming logic.
+
+### Cloud Analysis Pause/Resume Pattern
+Cloud folder analysis (S3 / Google Drive) supports pause/resume within a short TTL.
+
+- Server state is stored in-memory in `state/analysis-jobs.js` and is not crash-resistant.
+- Pause uses `AbortController.abort()` and sets `job.status='paused'`.
+- Resume reuses the same job and cursor token (S3 continuation token / Drive page token).
+- Important: preserve accumulated stats across resume.
+  - Pass prior `files`, `totalSize`, `fileTypes`, `pagesProcessed` into the analyzer and keep accumulating.
+  - Otherwise, `fileTypes` can appear to “disappear” right after clicking Continue.
+
+### Playwright Mocking Gotcha (Collections)
+The Axios interceptor automatically appends `?collection=...` to API requests.
+
+- When mocking routes in Playwright, match query params too (e.g. `**/pause*` not `**/pause`).
+- Symptom if missed: test waits forever for a mocked response that never matches.
 
 ### Pagination Pattern
 **Frontend** (`ResultsList.vue`):
@@ -520,9 +596,9 @@ Critical UI state persists across refreshes:
 - **Bookmarks**: `localStorage.getItem('bookmarkedDocuments')` in `ResultsList.vue` (Set → JSON array)
 - **Active uploads**: `localStorage.getItem('activeUploadJobId')` in `App.vue`
   - Job ID persists across page refresh
-  - Header button shows "Upload in progress..." when job active
+  - Header button shows "Upload in progress..." only while job is `processing`
   - **Modal does NOT auto-open** - user must click button to see progress
-  - Job state verified on mount: checks if still processing, clears if completed
+  - Job state verified on mount: checks if still `processing`, clears if `completed` or `stopped`
 - **NO query/filter state saved** - these come from URL params only
 
 ### Surprise Me Button
@@ -637,7 +713,7 @@ Qdrant **cannot filter on missing fields**. For `must_not: [{ key: 'pii_detected
 
 See `server.js` lines 906-940 for implementation pattern.
 
-## Express API Endpoints (29 routes)
+## Express API Endpoints (30 routes)
 
 **Search endpoints:**
 - `POST /api/search/semantic` - Dense vector search only
@@ -656,7 +732,9 @@ See `server.js` lines 906-940 for implementation pattern.
 - `POST /api/documents/upload` - Multi-file upload (async jobs, returns jobId immediately)
 - `GET /api/upload-jobs/active` - Get currently active upload job ⚠️ MUST come before :jobId route
 - `GET /api/upload-jobs/:jobId` - Get upload job status by ID
+- `GET /api/upload-jobs/:jobId/files` - Paged file status slice for large jobs (use `offset` + `limit`)
 - `POST /api/upload-jobs/:jobId/stop` - Stop upload (finishes current file, skips rest)
+- `POST /api/upload-jobs/:jobId/resume` - Resume a stopped cloud-import upload job
 
 **Temp Files:**
 - `POST /api/temp-files` - Store temporary file for "search by document" feature

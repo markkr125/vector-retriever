@@ -79,8 +79,16 @@ export async function getCollectionStats(collectionId) {
 }
 
 // Upload job management
-export async function getUploadJobStatus(jobId) {
-  const response = await api.get(`/upload-jobs/${jobId}`);
+export async function getUploadJobStatus(jobId, params = undefined) {
+  const response = await api.get(`/upload-jobs/${jobId}`, { params });
+  return response.data;
+}
+
+export async function getUploadJobFiles(jobId, { offset = 0, limit = 200, signal } = {}) {
+  const response = await api.get(`/upload-jobs/${jobId}/files`, {
+    params: { offset, limit },
+    signal
+  });
   return response.data;
 }
 
@@ -91,6 +99,11 @@ export async function getActiveUploadJob() {
 
 export async function stopUploadJob(jobId) {
   const response = await api.post(`/upload-jobs/${jobId}/stop`);
+  return response.data;
+}
+
+export async function resumeUploadJob(jobId) {
+  const response = await api.post(`/upload-jobs/${jobId}/resume`);
   return response.data;
 }
 

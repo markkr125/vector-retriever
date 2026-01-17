@@ -27,7 +27,8 @@ const PORT = process.env.SERVER_PORT || 3001;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Increase payload limit for cloud imports
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Configuration
 const OLLAMA_URL = process.env.OLLAMA_URL;
@@ -36,6 +37,8 @@ const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL;
 const QDRANT_URL = process.env.QDRANT_URL;
 const COLLECTION_NAME = process.env.COLLECTION_NAME || 'documents';
 const MAX_FILE_SIZE_MB = parseInt(process.env.MAX_FILE_SIZE_MB || '10', 10);
+const MAX_CLOUD_IMPORT_DOCS = parseInt(process.env.MAX_CLOUD_IMPORT_DOCS || '1000', 10);
+const MAX_CLOUD_IMPORT_SIZE_MB = parseInt(process.env.MAX_CLOUD_IMPORT_SIZE_MB || '500', 10);
 const CATEGORIZATION_MODEL = process.env.CATEGORIZATION_MODEL || '';
 
 if (!EMBEDDING_MODEL) {
@@ -163,6 +166,8 @@ app.use(
   '/api',
   createConfigHealthRoutes({
     maxFileSizeMB: MAX_FILE_SIZE_MB,
+    maxCloudImportDocs: MAX_CLOUD_IMPORT_DOCS,
+    maxCloudImportSizeMB: MAX_CLOUD_IMPORT_SIZE_MB,
     categorizationEnabled: Boolean(CATEGORIZATION_MODEL),
     piiDetectionEnabled: PII_DETECTION_ENABLED,
     piiDetectionMethod: PII_DETECTION_METHOD,
@@ -248,6 +253,20 @@ app.use(
     qdrantClient,
     piiDetectionEnabled: PII_DETECTION_ENABLED,
     piiService
+  })
+);
+
+// Cloud import routes
+const { createCloudImportRoutes } = require('./routes/cloud-import');
+app.use(
+  '/api/cloud-import',
+  createCloudImportRoutes({
+    collectionMiddleware,
+    documentService,
+    embeddingService,
+    categorizationService,
+    PIIDetectorFactory,
+    uploadJobs
   })
 );
 

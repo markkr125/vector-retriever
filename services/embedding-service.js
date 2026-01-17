@@ -50,7 +50,7 @@ function createEmbeddingService({ axios, ollamaUrl, authToken, model }) {
   /**
    * Get dense embedding from Ollama
    */
-  async function getDenseEmbedding(text) {
+  async function getDenseEmbedding(text, options = {}) {
     try {
       const headers = {
         'Content-Type': 'application/json'
@@ -63,7 +63,8 @@ function createEmbeddingService({ axios, ollamaUrl, authToken, model }) {
         input: text
       }, {
         headers,
-        timeout: 300000 // 5 minute timeout for large documents
+        timeout: 300000, // 5 minute timeout for large documents
+        signal: options.signal
       });
       return response.data.embeddings[0];
     } catch (error) {
