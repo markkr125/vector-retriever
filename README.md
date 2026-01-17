@@ -814,18 +814,8 @@ vector-retriever/
    - Show key information: summary, entities, topics, language detection
    - Display metadata extraction preview (categories, tags, dates, pii)
    - Quick decision tool: "Should I add this document?"
-✅ **Cloud import integration**: Import from public S3/Google Drive folders - **[See Documentation](docs/CLOUD_IMPORT.md)**
-   - ✅ **AWS S3**: Direct bucket/folder import with public URLs (no authentication required)
-   - ✅ **Google Drive**: Public folder import with shared links (optional, requires API key)
-   - ✅ **Pre-import analysis**: Display folder stats (file count, total size, file types breakdown)
-   - ✅ **Flexible import options**:
-     - Import all files from folder
-     - Import first X files (for testing/sampling)
-     - Search and select specific files with preview UI
-     - Filter by file type, size, or date range
-   - ✅ **Batch processing**: Background import with progress tracking and error handling
-   - ✅ **Full pipeline integration**: All processing features work (text extraction, categorization, PII detection, embeddings)
-   - **Batch processing**: Background import with progress tracking and error handling
+
+7. - **Batch processing**: Background import with progress tracking and error handling
 
 ## 📄 License
 
