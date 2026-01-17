@@ -434,6 +434,9 @@ uploadJobs.set(jobId, {
   - **Resume Upload** button for cloud-import jobs to continue remaining queued files
 - Close button always visible (modal can be closed, upload continues)
 - **No auto-open on refresh** - header shows "Upload in progress..." only while the job is `processing`; modal stays closed
+- **Header button state for stopped uploads**: When a stopped job's progress modal is closed (via Close or Back), the header button reverts to "➕ Add Document"
+  - `activeUploadJobId` is cleared from localStorage when job status is `stopped` or `completed` on modal close
+  - On page refresh, only `processing` jobs restore the "Upload in progress..." button state
 - **Polling safeguards**: Uses watchers for `props.show` and `props.jobId` to prevent duplicate intervals
 - `startPolling()` calls `stopPolling()` first to ensure only one interval runs
 
@@ -503,6 +506,12 @@ Cloud folder analysis (S3 / Google Drive) supports pause/resume within a short T
   - Pass prior `files`, `totalSize`, `fileTypes`, `pagesProcessed` into the analyzer and keep accumulating.
   - Otherwise, `fileTypes` can appear to “disappear” right after clicking Continue.
 
+
+**Clear Analysis Button:**
+- UI button in `UploadModal.vue` analysis results header: **"🧹 Clear Analysis"**
+- Prompts for confirmation via `confirm()` before clearing
+- Resets all analysis state: `folderAnalysis`, `selectedCloudFiles`, `resumableAnalysis`, `analysisJobId`, `importOption`, `importLimit`
+- Allows users to start fresh or switch to a different folder without closing the modal
 ### Playwright Mocking Gotcha (Collections)
 The Axios interceptor automatically appends `?collection=...` to API requests.
 
@@ -599,6 +608,7 @@ Critical UI state persists across refreshes:
   - Header button shows "Upload in progress..." only while job is `processing`
   - **Modal does NOT auto-open** - user must click button to see progress
   - Job state verified on mount: checks if still `processing`, clears if `completed` or `stopped`
+  - When stopped job's progress modal is closed (via Close or Back button), `activeUploadJobId` is cleared and header reverts to "➕ Add Document"
 - **NO query/filter state saved** - these come from URL params only
 
 ### Surprise Me Button

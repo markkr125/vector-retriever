@@ -61,6 +61,7 @@ In the web UI:
    - Total files
    - Total size
    - File type breakdown
+6. (Optional) Click **"🧹 Clear Analysis"** to reset analysis results and start over
 
 **Note:** Analysis runs as a background job and streams progress into the modal. It does not block the UI.
 
@@ -83,6 +84,12 @@ Long-running folder analysis supports pausing and resuming from the last cursor.
 **TTL / persistence**
 - Resume works for the same provider+URL within ~5–10 minutes.
 - Resume state is in-memory only (server restart clears it).
+
+**Clearing Analysis Results**
+- Click **"🧹 Clear Analysis"** button in the analysis header to reset all results
+- Confirmation dialog prevents accidental clearing
+- Clears: folder analysis, file selection, import options, and resumable state
+- Useful for starting fresh or switching to a different folder
 
 ### 3. Choose Import Option
 
@@ -373,9 +380,11 @@ Cloud imports use the same progress tracking system as file uploads.
 ### Monitoring Active Imports
 
 If you refresh the page during an import:
-1. Header shows **"Upload in progress..."** button
+1. Header shows **"Upload in progress..."** button (only while job is `processing`)
 2. Click to reopen progress modal
 3. Status resumes from last update
+
+**Note**: If you stop an upload and close the progress modal, the header button returns to **"Add Document"**. Stopped jobs are not automatically restored on refresh.
 
 ## Processing Pipeline
 
