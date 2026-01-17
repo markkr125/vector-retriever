@@ -143,6 +143,13 @@
             <div v-if="folderAnalysis" class="analysis-results">
               <div class="analysis-header">
                 <h3>📊 Folder Analysis</h3>
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-small btn-clear-analysis"
+                  @click="confirmClearAnalysis"
+                >
+                  🧹 Clear Analysis
+                </button>
               </div>
               
               <div class="analysis-stats">
@@ -554,6 +561,20 @@ const clearAnalysis = () => {
   selectedCloudFiles.value = []
   cloudErrorMessage.value = ''
   resumableAnalysis.value = null
+  analysisJobId.value = null
+  showAnalysisProgress.value = false
+  showFileSelector.value = false
+  importOption.value = 'first'
+  importLimit.value = 10
+}
+
+const confirmClearAnalysis = () => {
+  if (!folderAnalysis.value && !resumableAnalysis.value) return
+  const ok = confirm(
+    'Clear the folder analysis results? This will reset file selection and import options.'
+  )
+  if (!ok) return
+  clearAnalysis()
 }
 
 let resumableLookupTimer = null
