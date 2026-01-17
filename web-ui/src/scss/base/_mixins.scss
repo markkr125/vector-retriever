@@ -74,3 +74,110 @@
 	}
 }
 
+@mixin panel-header(
+	$background: $gradient-brand,
+	$padding: 1.5rem,
+	$text-color: $color-white,
+	$radius-top: $radius-xl
+) {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: $padding;
+	background: $background;
+	color: $text-color;
+	border-radius: $radius-top $radius-top 0 0;
+}
+
+@mixin close-button-inverse(
+	$size: 2rem,
+	$font-size: 1.75rem,
+	$radius: $radius-md
+) {
+	background: rgba(255, 255, 255, 0.2);
+	border: none;
+	font-size: $font-size;
+	line-height: 1;
+	color: $color-white;
+	cursor: pointer;
+	padding: 0;
+	width: $size;
+	height: $size;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: $radius;
+	transition: all $transition;
+	backdrop-filter: blur(10px);
+
+	&:hover {
+		background: rgba(255, 255, 255, 0.3);
+		transform: scale(1.1);
+	}
+}
+
+@mixin close-button(
+	$size: 2rem,
+	$font-size: 2rem,
+	$radius: $radius-sm
+) {
+	background: none;
+	border: none;
+	font-size: $font-size;
+	line-height: 1;
+	color: $color-text-muted;
+	cursor: pointer;
+	padding: 0;
+	width: $size;
+	height: $size;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: $radius;
+	transition: all $transition;
+
+	&:hover {
+		background: $color-bg;
+		color: $color-text;
+	}
+}
+
+@mixin control-compact(
+	$padding: 0.5rem,
+	$radius: $radius-sm
+) {
+	padding: $padding;
+	border: 1px solid $color-border;
+	border-radius: $radius;
+	font-size: 0.875rem;
+	background: $color-surface;
+	color: $color-text;
+	transition: all $transition;
+
+	&:focus {
+		outline: none;
+		border-color: $color-primary;
+		@include focus-ring(rgba(79, 70, 229, 0.1));
+	}
+}
+
+@mixin subtle-bordered-button(
+	$padding: 0.25rem 0.5rem,
+	$radius: $radius-md,
+	$font-size: 0.8125rem
+) {
+	border: 1px solid $color-border;
+	background: $color-surface;
+	border-radius: $radius;
+	padding: $padding;
+	font-size: $font-size;
+	cursor: pointer;
+	color: $color-text-muted;
+	transition: all $transition-fast;
+
+	&:hover {
+		border-color: $color-primary;
+		color: $color-primary;
+	}
+}
+
