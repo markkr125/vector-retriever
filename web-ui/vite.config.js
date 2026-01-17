@@ -9,6 +9,18 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        // Auto-inject shared tokens + mixins into every SCSS file.
+        // This keeps component SCSS files small and consistent.
+        additionalData: [
+          '@use "@/scss/base/variables" as *;',
+          '@use "@/scss/base/mixins" as *;'
+        ].join('\n') + '\n'
+      }
+    }
+  },
   server: {
     port: 5173,
     proxy: {

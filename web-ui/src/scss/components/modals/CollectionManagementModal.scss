@@ -82,11 +82,13 @@
 }
 
 .input-field {
-  padding: 10px 14px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 15px;
-  font-family: inherit;
+  @include input-base(
+    $padding: 10px 14px,
+    $radius: $radius-md,
+    $font-size: 15px,
+    $border-color: #ddd,
+    $background: white
+  );
 }
 
 .input-field:focus {
@@ -95,13 +97,14 @@
 }
 
 .btn {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 15px;
-  font-weight: 500;
-  transition: all 0.2s;
+  @include button-base(
+    $padding: 10px 20px,
+    $radius: $radius-md,
+    $font-size: 15px,
+    $font-weight: 500,
+    $border: none,
+    $transition: all 0.2s
+  );
 }
 
 .btn:disabled {
@@ -120,11 +123,17 @@
 
 .error-message {
   margin-top: 12px;
-  padding: 10px;
-  background: #fee;
-  color: #c33;
-  border-radius: 6px;
-  font-size: 14px;
+  @include status-banner(
+    $bg: #fee,
+    $border-color: #c33,
+    $text-color: #c33,
+    $border-left: true,
+    $border-width: 4px,
+    $radius: 6px,
+    $padding: 10px,
+    $font-size: 14px,
+    $font-weight: 500
+  );
 }
 
 .collections-section h3 {
@@ -413,21 +422,8 @@
 }
 
 /* Scrollbar styling */
-.modal-body::-webkit-scrollbar {
-  width: 10px;
-}
-
-.modal-body::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-.modal-body::-webkit-scrollbar-thumb {
-  background: #bdc3c7;
-  border-radius: 5px;
-}
-
-.modal-body::-webkit-scrollbar-thumb:hover {
-  background: #95a5a6;
+.modal-body {
+  @include scrollbars($size: 10px);
 }
 
 /* Pagination */

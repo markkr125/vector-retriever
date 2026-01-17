@@ -85,23 +85,23 @@
 
 .facet-count.danger {
   background: #ffebee;
-  color: #d32f2f;
+  color: $color-critical-accent;
   font-weight: 700;
 }
 
 /* PII Facet Styles */
 .pii-facet .facet-header.has-warning {
-  background: linear-gradient(135deg, rgba(255, 152, 0, 0.1), rgba(255, 87, 34, 0.1));
-  border-left: 3px solid #ff5722;
+  background: linear-gradient(135deg, rgba($color-warning, 0.1), rgba($color-danger-accent, 0.1));
+  border-left: 3px solid $color-danger-accent;
 }
 
 .pii-any-item {
-  background: rgba(255, 152, 0, 0.05);
-  border-left: 3px solid #ff9800;
+  background: rgba($color-warning, 0.05);
+  border-left: 3px solid $color-warning;
 }
 
 .pii-type-item:hover {
-  border-left: 3px solid #ff9800;
+  border-left: 3px solid $color-warning;
 }
 
 .facet-subheader {
@@ -115,19 +115,19 @@
 }
 
 .risk-item.risk-low {
-  border-left: 3px solid #4caf50;
+  border-left: 3px solid $color-success-accent;
 }
 
 .risk-item.risk-medium {
-  border-left: 3px solid #ff9800;
+  border-left: 3px solid $color-warning;
 }
 
 .risk-item.risk-high {
-  border-left: 3px solid #ff5722;
+  border-left: 3px solid $color-danger-accent;
 }
 
 .risk-item.risk-critical {
-  border-left: 3px solid #d32f2f;
+  border-left: 3px solid $color-critical-accent;
   background: rgba(211, 47, 47, 0.05);
 }
 
@@ -146,10 +146,10 @@
   cursor: pointer;
   transition: all 0.2s;
   font-size: 0.9rem;
+
+  @include lift-hover($shadow: 0 4px 12px rgba(66, 133, 244, 0.3));
 }
 
 .btn-bulk-scan:hover {
   background: var(--primary-dark);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(66, 133, 244, 0.3);
 }

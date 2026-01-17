@@ -223,11 +223,11 @@
 
 <script>
 import {
-  createCollection,
-  deleteCollection,
-  emptyCollection,
-  fetchCollections,
-  renameCollection
+    createCollection,
+    deleteCollection,
+    emptyCollection,
+    fetchCollections,
+    renameCollection
 } from '@/api';
 import { computed, onMounted, ref, watch } from 'vue';
 
@@ -541,4 +541,4 @@ export default {
 };
 </script>
 
-<style scoped src="@/css/CollectionManagementModal.css"></style>
+<style scoped lang="scss" src="@/scss/components/modals/CollectionManagementModal.scss"></style>

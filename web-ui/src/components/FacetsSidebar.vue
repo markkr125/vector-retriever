@@ -211,4 +211,4 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped src="@/css/FacetsSidebar.css"></style>
+<style scoped lang="scss" src="@/scss/components/sidebar/FacetsSidebar.scss"></style>

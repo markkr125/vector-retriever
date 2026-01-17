@@ -1,35 +1,14 @@
 /* Modal Overlay */
 .modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
+  @include modal-overlay($z: $z-dropdown, $blur: 0);
   padding: 1rem;
 }
 
 /* Modal Content */
 .modal-content {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  animation: slideIn 0.3s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  @include modal-panel($radius: $radius-xl);
+  box-shadow: $shadow-float;
+  animation: vr-slide-in 0.3s ease-out;
 }
 
 .file-selector-modal {
@@ -42,12 +21,7 @@
 
 /* Modal Header */
 .file-selector-modal .modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem 1.5rem 1rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 12px 12px 0 0;
+  @include panel-header($background: $gradient-brand, $padding: 1.5rem 1.5rem 1rem, $radius-top: $radius-xl);
   position: relative;
 }
 
@@ -60,26 +34,7 @@
 }
 
 .file-selector-modal .close-btn {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  font-size: 1.75rem;
-  line-height: 1;
-  color: white;
-  cursor: pointer;
-  padding: 0;
-  width: 2rem;
-  height: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: all 0.2s;
-  backdrop-filter: blur(10px);
-}
-
-.file-selector-modal .close-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.1);
+  @include close-button-inverse($size: 2rem, $font-size: 1.75rem, $radius: $radius-md);
 }
 
 .file-selector-modal .modal-body {
@@ -96,7 +51,7 @@
   display: flex;
   gap: 2rem;
   padding: 1rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: $gradient-brand;
   border-radius: 8px;
   color: white;
 }
@@ -129,14 +84,14 @@
   grid-template-columns: 2fr 1fr 1fr;
   gap: 1rem;
   padding: 1rem;
-  background: #f8f9fa;
+  background: $color-bg;
   border-radius: 8px;
 }
 
 /* Folder Navigation */
 .folder-nav {
   padding: 0.75rem 1rem;
-  background: #f8f9fa;
+  background: $color-bg;
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -151,29 +106,17 @@
 }
 
 .crumb {
-  border: 1px solid #dee2e6;
-  background: white;
-  border-radius: 6px;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.8125rem;
-  cursor: pointer;
-  color: #495057;
-  transition: all 0.15s;
-}
-
-.crumb:hover {
-  border-color: #667eea;
-  color: #667eea;
+  @include subtle-bordered-button($padding: 0.25rem 0.5rem, $radius: $radius-md, $font-size: 0.8125rem);
 }
 
 .crumb.active {
-  border-color: #667eea;
-  color: #667eea;
+  border-color: $color-primary;
+  color: $color-primary;
   font-weight: 600;
 }
 
 .crumb-sep {
-  color: #adb5bd;
+  color: $color-text-muted;
   font-size: 0.875rem;
 }
 
@@ -184,23 +127,12 @@
 }
 
 .folder-up {
-  padding: 0.25rem 0.5rem;
-  border: 1px solid #dee2e6;
-  background: white;
-  border-radius: 6px;
-  font-size: 0.8125rem;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.folder-up:hover {
-  border-color: #667eea;
-  color: #667eea;
+  @include subtle-bordered-button($padding: 0.25rem 0.5rem, $radius: $radius-md, $font-size: 0.8125rem);
 }
 
 .folder-path {
   font-size: 0.8125rem;
-  color: #6c757d;
+  color: $color-text-muted;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -215,23 +147,12 @@
 .filter-group label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #495057;
+  color: $color-text;
 }
 
 .filter-input,
 .filter-select {
-  padding: 0.5rem;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  background: white;
-}
-
-.filter-input:focus,
-.filter-select:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  @include control-compact($padding: 0.5rem, $radius: $radius-sm);
 }
 
 /* Bulk Actions */
@@ -241,28 +162,21 @@
 }
 
 .action-btn {
-  padding: 0.5rem 1rem;
-  border: 1px solid #ced4da;
-  background: white;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: all 0.2s;
+  @include subtle-bordered-button($padding: 0.5rem 1rem, $radius: $radius-sm, $font-size: 0.875rem);
+  color: $color-text;
 }
 
 .action-btn:hover {
-  background: #f8f9fa;
-  border-color: #667eea;
-  color: #667eea;
+  background: $color-bg;
 }
 
 /* Files List */
 .files-list {
   flex: 1;
   overflow-y: auto;
-  border: 1px solid #dee2e6;
+  border: 1px solid $color-border;
   border-radius: 8px;
-  background: white;
+  background: $color-surface;
 }
 
 .file-item {
@@ -270,17 +184,17 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid $color-border;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .folder-item {
-  background: #fcfcff;
+  background: $color-surface;
 }
 
 .folder-item:hover {
-  background: #f3f4ff;
+  background: $color-bg;
 }
 
 .folder-icon {
@@ -293,12 +207,12 @@
 }
 
 .file-item:hover {
-  background: #f8f9fa;
+  background: $color-bg;
 }
 
 .file-item.selected {
-  background: #e7f3ff;
-  border-left: 3px solid #667eea;
+  background: rgba(102, 126, 234, 0.12);
+  border-left: 3px solid $color-primary;
 }
 
 .file-item:last-child {
@@ -310,6 +224,7 @@
   height: 18px;
   cursor: pointer;
   flex-shrink: 0;
+  accent-color: $color-primary;
 }
 
 .file-info {
@@ -319,7 +234,7 @@
 
 .file-name {
   font-weight: 500;
-  color: #212529;
+  color: $color-text;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -333,13 +248,13 @@
   gap: 1rem;
   margin-top: 0.25rem;
   font-size: 0.75rem;
-  color: #6c757d;
+  color: $color-text-muted;
 }
 
 .file-path {
   margin-top: 0.25rem;
   font-size: 0.75rem;
-  color: #868e96;
+  color: $color-text-muted;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -352,21 +267,21 @@
 .file-type {
   text-transform: uppercase;
   font-weight: 600;
-  color: #667eea;
+  color: $color-primary;
 }
 
 .file-size {
-  color: #6c757d;
+  color: $color-text-muted;
 }
 
 .file-date {
-  color: #adb5bd;
+  color: $color-text-muted;
 }
 
 .empty-state {
   padding: 3rem;
   text-align: center;
-  color: #6c757d;
+  color: $color-text-muted;
   font-style: italic;
 }
 
@@ -377,24 +292,18 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  background: #f8f9fa;
+  background: $color-bg;
   border-radius: 8px;
 }
 
 .page-btn {
-  padding: 0.5rem 1rem;
-  border: 1px solid #ced4da;
-  background: white;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: all 0.2s;
+  @include subtle-bordered-button($padding: 0.5rem 1rem, $radius: $radius-sm, $font-size: 0.875rem);
 }
 
 .page-btn:hover:not(:disabled) {
-  background: #667eea;
+  background: $color-primary;
   color: white;
-  border-color: #667eea;
+  border-color: $color-primary;
 }
 
 .page-btn:disabled {
@@ -404,7 +313,7 @@
 
 .page-info {
   font-size: 0.875rem;
-  color: #495057;
+  color: $color-text;
   font-weight: 500;
 }
 
@@ -414,8 +323,8 @@
   justify-content: flex-end;
   gap: 0.75rem;
   padding: 1rem 1.5rem;
-  border-top: 1px solid #dee2e6;
-  background: #f8f9fa;
+  border-top: 1px solid $color-border;
+  background: $color-bg;
 }
 
 .btn-cancel,
@@ -430,22 +339,18 @@
 }
 
 .btn-cancel {
-  background: #6c757d;
+  background: $color-secondary;
   color: white;
 }
 
 .btn-cancel:hover {
-  background: #5a6268;
+  background: $color-secondary-hover;
 }
 
 .btn-confirm {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: $gradient-brand;
   color: white;
-}
-
-.btn-confirm:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+  @include lift-hover($y: -1px, $shadow: 0 4px 8px rgba(102, 126, 234, 0.3));
 }
 
 .btn-confirm:disabled {

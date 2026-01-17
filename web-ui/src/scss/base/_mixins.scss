@@ -1,0 +1,286 @@
+// Shared SCSS mixins (reusable patterns).
+//
+// These mixins are auto-injected into every SCSS file via Vite
+// `css.preprocessorOptions.scss.additionalData`.
+
+@use './variables' as *;
+
+@mixin truncate-one-line {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+@mixin focus-ring($ring-color: rgba(79, 70, 229, 0.2)) {
+	outline: none;
+	box-shadow: 0 0 0 3px $ring-color;
+}
+
+@mixin modal-overlay(
+	$z: $z-modal,
+	$bg: rgba(0, 0, 0, 0.5),
+	$blur: 4px
+) {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: $bg;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: $z;
+
+	@if $blur != 0 {
+		backdrop-filter: blur($blur);
+	}
+}
+
+@mixin modal-panel(
+	$bg: $color-surface,
+	$radius: $radius-xl,
+	$shadow: $shadow-lg
+) {
+	background: $bg;
+	border-radius: $radius;
+	box-shadow: $shadow;
+	border: 1px solid $color-border;
+}
+
+@mixin scrollbars(
+	$size: 8px,
+	$track: #f1f1f1,
+	$thumb: #bdc3c7,
+	$thumb-hover: #95a5a6
+) {
+	&::-webkit-scrollbar {
+		width: $size;
+		height: $size;
+	}
+
+	&::-webkit-scrollbar-track {
+		background: $track;
+		border-radius: calc($size / 2);
+	}
+
+	&::-webkit-scrollbar-thumb {
+		background: $thumb;
+		border-radius: calc($size / 2);
+	}
+
+	&::-webkit-scrollbar-thumb:hover {
+		background: $thumb-hover;
+	}
+}
+
+@mixin panel-header(
+	$background: $gradient-brand,
+	$padding: 1.5rem,
+	$text-color: $color-white,
+	$radius-top: $radius-xl
+) {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: $padding;
+	background: $background;
+	color: $text-color;
+	border-radius: $radius-top $radius-top 0 0;
+}
+
+@mixin close-button-inverse(
+	$size: 2rem,
+	$font-size: 1.75rem,
+	$radius: $radius-md
+) {
+	background: rgba(255, 255, 255, 0.2);
+	border: none;
+	font-size: $font-size;
+	line-height: 1;
+	color: $color-white;
+	cursor: pointer;
+	padding: 0;
+	width: $size;
+	height: $size;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: $radius;
+	transition: all $transition;
+	backdrop-filter: blur(10px);
+
+	&:hover {
+		background: rgba(255, 255, 255, 0.3);
+		transform: scale(1.1);
+	}
+}
+
+@mixin close-button(
+	$size: 2rem,
+	$font-size: 2rem,
+	$radius: $radius-sm
+) {
+	background: none;
+	border: none;
+	font-size: $font-size;
+	line-height: 1;
+	color: $color-text-muted;
+	cursor: pointer;
+	padding: 0;
+	width: $size;
+	height: $size;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: $radius;
+	transition: all $transition;
+
+	&:hover {
+		background: $color-bg;
+		color: $color-text;
+	}
+}
+
+@mixin control-compact(
+	$padding: 0.5rem,
+	$radius: $radius-sm
+) {
+	padding: $padding;
+	border: 1px solid $color-border;
+	border-radius: $radius;
+	font-size: 0.875rem;
+	background: $color-surface;
+	color: $color-text;
+	transition: all $transition;
+
+	&:focus {
+		outline: none;
+		border-color: $color-primary;
+		@include focus-ring(rgba(79, 70, 229, 0.1));
+	}
+}
+
+@mixin subtle-bordered-button(
+	$padding: 0.25rem 0.5rem,
+	$radius: $radius-md,
+	$font-size: 0.8125rem
+) {
+	border: 1px solid $color-border;
+	background: $color-surface;
+	border-radius: $radius;
+	padding: $padding;
+	font-size: $font-size;
+	cursor: pointer;
+	color: $color-text-muted;
+	transition: all $transition-fast;
+
+	&:hover {
+		border-color: $color-primary;
+		color: $color-primary;
+	}
+}
+
+@mixin button-base(
+	$padding: 0.6rem 1.2rem,
+	$radius: $radius-sm,
+	$font-size: 0.9rem,
+	$font-weight: 500,
+	$border: none,
+	$transition: all $transition
+) {
+	padding: $padding;
+	border: $border;
+	border-radius: $radius;
+	font-size: $font-size;
+	font-weight: $font-weight;
+	cursor: pointer;
+	transition: $transition;
+}
+
+@mixin input-base(
+	$padding: 0.5rem 1rem,
+	$radius: $radius-sm,
+	$font-size: 0.9rem,
+	$border-color: $color-border,
+	$background: $color-surface
+) {
+	padding: $padding;
+	border: 1px solid $border-color;
+	border-radius: $radius;
+	font-size: $font-size;
+	font-family: inherit;
+	background: $background;
+}
+
+@mixin accent-border-hover(
+	$accent: $color-warning,
+	$shadow-alpha: 0.2,
+	$shadow-y: 2px,
+	$shadow-blur: 8px
+) {
+	&:hover {
+		border-color: $accent;
+		box-shadow: 0 $shadow-y $shadow-blur rgba($accent, $shadow-alpha);
+	}
+}
+
+@mixin accent-solid-button(
+	$bg: $color-warning,
+	$bg-hover: $color-warning-hover,
+	$lift: -1px
+) {
+	background: $bg;
+	color: $color-white;
+
+	&:hover:not(:disabled) {
+		background: $bg-hover;
+		transform: translateY($lift);
+	}
+}
+
+@mixin lift-hover(
+	$y: -2px,
+	$shadow: 0 4px 12px rgba(0, 0, 0, 0.15)
+) {
+	&:hover:not(:disabled) {
+		transform: translateY($y);
+		box-shadow: $shadow;
+	}
+}
+
+@mixin status-banner(
+	$bg,
+	$border-color,
+	$text-color: $color-text,
+	$border-left: true,
+	$border-width: 4px,
+	$border-size: 1px,
+	$radius: 8px,
+	$padding: 1rem,
+	$font-size: 0.95rem,
+	$font-weight: 500,
+	$layout: null,
+	$gap: 0.75rem,
+	$align: center
+) {
+	background: $bg;
+	color: $text-color;
+	border-radius: $radius;
+	padding: $padding;
+	font-size: $font-size;
+	font-weight: $font-weight;
+
+	@if $border-left {
+		border-left: $border-width solid $border-color;
+	} @else {
+		border: $border-size solid $border-color;
+	}
+
+	@if $layout == row {
+		display: flex;
+		align-items: $align;
+		gap: $gap;
+	}
+}
+

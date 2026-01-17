@@ -87,12 +87,12 @@
 }
 
 .btn-add.uploading {
-  background: linear-gradient(90deg, #ff9800, #f57c00);
-  animation: pulse 2s ease-in-out infinite;
+  background: linear-gradient(90deg, $color-warning, $color-warning-hover);
+  animation: vr-pulse 2s ease-in-out infinite;
 }
 
 .btn-add.uploading:hover {
-  background: linear-gradient(90deg, #f57c00, #e65100);
+  background: linear-gradient(90deg, $color-warning-hover, #e65100);
 }
 
 .btn-secondary.active {
@@ -107,15 +107,6 @@
 
 .btn-secondary:hover {
   background: rgba(41, 128, 185, 0.6);
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.8;
-  }
 }
 
 .main {

@@ -226,4 +226,4 @@ onMounted(() => {
 });
 </script>
 
-<style scoped src="@/css/DocumentClusterView.css"></style>
+<style scoped lang="scss" src="@/scss/components/visualization/DocumentClusterView.scss"></style>

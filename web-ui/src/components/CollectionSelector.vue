@@ -151,4 +151,4 @@ export default {
 };
 </script>
 
-<style scoped src="@/css/CollectionSelector.css"></style>
+<style scoped lang="scss" src="@/scss/components/collections/CollectionSelector.scss"></style>
