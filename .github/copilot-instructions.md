@@ -147,14 +147,14 @@ Entry behavior is unchanged: `npm run server` runs `server.js`.
 }
 ```
 
-### Vue Component CSS Organization
-**CRITICAL:** All Vue components MUST have CSS in separate files, not inline `<style>` blocks.
+### Vue Component Styling (SCSS)
+**CRITICAL:** All Vue components MUST keep styles in external files (no inline `<style>` blocks).
 
 **Rules for component creation/modification:**
-1. **CSS files location**: `web-ui/src/css/ComponentName.css` (NOT in components directory)
-2. **Component reference**: Use external CSS via `<style scoped src="@/css/ComponentName.css"></style>`
-3. **Threshold**: ANY new component with CSS should use external files (no minimum line count)
-4. **Common styles**: Consider extracting duplicate patterns (buttons, modals, badges) to `common.css`
+1. **Component SCSS location**: `web-ui/src/scss/components/ComponentName.scss`
+2. **Component reference**: Use external SCSS via `<style scoped lang="scss" src="@/scss/components/ComponentName.scss"></style>`
+3. **Global styles**: Live under `web-ui/src/scss/base/` and are loaded via `web-ui/src/scss/main.scss` (imported by `web-ui/src/main.js`).
+4. **Shared patterns**: Prefer extracting repeated button/modal/badge patterns into a shared partial under `web-ui/src/scss/base/` and import it from `web-ui/src/scss/main.scss`.
 
 **Example Vue component structure:**
 ```vue
@@ -166,20 +166,12 @@ Entry behavior is unchanged: `npm run server` runs `server.js`.
 // Component logic
 </script>
 
-<style scoped src="@/css/ComponentName.css"></style>
+<style scoped lang="scss" src="@/scss/components/ComponentName.scss"></style>
 ```
 
-**Why external CSS:**
-- Maintainability: Easier to find and edit styles
-- Consistency: Encourages reusable CSS patterns
-- Performance: Better caching and code splitting
-- Separation of concerns: Clean component structure
-
-**Current duplication stats (as of Jan 2025):**
-- 12 CSS files, 4,124 total lines
-- 10.1% duplication rate (60 duplicate selectors)
-- Most duplicated: `.btn` (8 files), `.badge` (6 files), modal classes (4 files)
-- **Action item**: Create `common.css` for shared button, modal, badge, and animation styles
+**Notes:**
+- The project still uses CSS Custom Properties (CSS variables) in `:root` (see `web-ui/src/scss/base/_globals.scss`) for runtime theming.
+- Use SCSS primarily for file organization, partials, and reuse (mixins/functions) rather than replacing runtime theme tokens.
 
 ### Collections System Architecture
 **Multi-tenant document isolation** - Each collection is a separate Qdrant collection with independent documents:

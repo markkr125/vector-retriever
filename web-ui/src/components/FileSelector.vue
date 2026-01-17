@@ -492,4 +492,4 @@ watch(() => props.show, (newVal) => {
 })
 </script>
 
-<style scoped src="@/css/FileSelector.css"></style>
+<style scoped lang="scss" src="@/scss/components/FileSelector.scss"></style>

@@ -361,4 +361,4 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped src="@/css/AnalysisProgressModal.css"></style>
+<style scoped lang="scss" src="@/scss/components/AnalysisProgressModal.scss"></style>

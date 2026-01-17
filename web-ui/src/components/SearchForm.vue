@@ -675,4 +675,4 @@ watch(searchType, () => {
 })
 </script>
 
-<style scoped src="@/css/SearchForm.css"></style>
+<style scoped lang="scss" src="@/scss/components/SearchForm.scss"></style>

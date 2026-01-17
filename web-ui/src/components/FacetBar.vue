@@ -509,4 +509,4 @@ watch(() => {}, () => {
 })
 </script>
 
-<style scoped src="@/css/FacetBar.css"></style>
+<style scoped lang="scss" src="@/scss/components/FacetBar.scss"></style>
