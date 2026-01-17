@@ -87,12 +87,12 @@
 }
 
 .btn-add.uploading {
-  background: linear-gradient(90deg, #ff9800, #f57c00);
+  background: linear-gradient(90deg, $color-warning, $color-warning-hover);
   animation: pulse 2s ease-in-out infinite;
 }
 
 .btn-add.uploading:hover {
-  background: linear-gradient(90deg, #f57c00, #e65100);
+  background: linear-gradient(90deg, $color-warning-hover, #e65100);
 }
 
 .btn-secondary.active {

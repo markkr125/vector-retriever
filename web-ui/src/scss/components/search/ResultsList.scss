@@ -651,8 +651,8 @@
   align-items: center;
   gap: 0.4rem;
   padding: 0.5rem 0.75rem;
-  background: linear-gradient(135deg, #ff9800, #ff5722);
-  border: 2px solid #ff5722;
+  background: linear-gradient(135deg, $color-warning, $color-danger-accent);
+  border: 2px solid $color-danger-accent;
   border-radius: 6px;
   color: white;
   font-weight: 600;
@@ -663,28 +663,27 @@
 }
 
 .pii-warning-badge-inline:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 87, 34, 0.3);
+  @include lift-hover($shadow: 0 4px 12px rgba($color-danger-accent, 0.3));
 }
 
 .pii-warning-badge-inline.risk-low {
-  background: linear-gradient(135deg, #4caf50, #45a049);
-  border-color: #4caf50;
+  background: linear-gradient(135deg, $color-success-accent, #45a049);
+  border-color: $color-success-accent;
 }
 
 .pii-warning-badge-inline.risk-medium {
-  background: linear-gradient(135deg, #ff9800, #fb8c00);
-  border-color: #ff9800;
+  background: linear-gradient(135deg, $color-warning, #fb8c00);
+  border-color: $color-warning;
 }
 
 .pii-warning-badge-inline.risk-high {
-  background: linear-gradient(135deg, #ff5722, #f4511e);
-  border-color: #ff5722;
+  background: linear-gradient(135deg, $color-danger-accent, $color-danger-accent-hover);
+  border-color: $color-danger-accent;
 }
 
 .pii-warning-badge-inline.risk-critical {
-  background: linear-gradient(135deg, #d32f2f, #c62828);
-  border-color: #d32f2f;
+  background: linear-gradient(135deg, $color-critical-accent, $color-critical-accent-hover);
+  border-color: $color-critical-accent;
   animation: pulse 2s infinite;
 }
 
@@ -707,7 +706,7 @@
 /* Inline Scan Button */
 .btn-scan-pii-inline {
   padding: 0.5rem 0.9rem;
-  background: #ff5722;
+  background: $color-danger-accent;
   color: white;
   border: none;
   border-radius: 4px;
@@ -719,7 +718,7 @@
 }
 
 .btn-scan-pii-inline:hover:not(:disabled) {
-  background: #f4511e;
+  background: $color-danger-accent-hover;
 }
 
 .btn-scan-pii-inline.already-scanned {

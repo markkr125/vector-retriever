@@ -33,8 +33,7 @@
 
 .stop-btn {
   padding: 0.5rem 1rem;
-  background: #ff9800;
-  color: white;
+  @include accent-solid-button($bg: $color-warning, $bg-hover: $color-warning-hover);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -43,30 +42,8 @@
   transition: all 0.2s;
 }
 
-.stop-btn:hover {
-  background: #f57c00;
-  transform: translateY(-1px);
-}
-
 .close-btn {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 1.5rem;
-  line-height: 1;
-  color: var(--text-secondary, #6b7280);
-  transition: all 0.2s;
-}
-
-.close-btn:hover {
-  background: var(--background, #f9fafb);
-  color: var(--text-primary, #111827);
+  @include close-button($size: 32px, $font-size: 1.5rem, $radius: $radius-md);
 }
 
 .modal-body {
@@ -92,7 +69,7 @@
 }
 
 .stat.success {
-  color: #10b981;
+  color: $color-success-accent;
   font-weight: 500;
 }
 
@@ -157,7 +134,7 @@
 }
 
 .progress-fill.stopped {
-  background: linear-gradient(90deg, #ff9800, #f57c00);
+  background: linear-gradient(90deg, $color-warning, $color-warning-hover);
   background-size: 200% 100%;
   animation: shimmer 2s infinite linear;
 }
@@ -191,14 +168,14 @@
 }
 
 .status-message.completed {
-  background: #f0fdf4;
-  border-left-color: #10b981;
-  color: #059669;
+  background: $bg-success-soft;
+  border-left-color: $color-success-accent;
+  color: $text-success;
 }
 
 .status-message.stopped {
-  background: #fff7ed;
-  border-left-color: #ff9800;
+  background: $bg-warning-soft;
+  border-left-color: $color-warning;
   color: #ea580c;
 }
 
@@ -224,18 +201,18 @@
 }
 
 .file-item.success {
-  border-left-color: #10b981;
-  background: #f0fdf4;
+  border-left-color: $color-success-accent;
+  background: $bg-success-soft;
 }
 
 .file-item.error {
   border-left-color: var(--error, #ef4444);
-  background: #fef2f2;
+  background: $bg-error-soft;
 }
 
 .file-item.processing {
   border-left-color: var(--primary-color, #4f46e5);
-  background: #eef2ff;
+  background: $bg-info-soft;
 }
 
 .file-icon {
@@ -331,11 +308,5 @@
 }
 
 .btn-warning {
-  background: #ff9800;
-  color: white;
-}
-
-.btn-warning:hover {
-  background: #f57c00;
-  transform: translateY(-1px);
+  @include accent-solid-button($bg: $color-warning, $bg-hover: $color-warning-hover);
 }

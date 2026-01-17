@@ -1,24 +1,12 @@
 /* Analysis Modal Overlay */
 .analysis-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
+  @include modal-overlay($bg: $overlay-60, $blur: 4px, $z: $z-modal);
   padding: 1rem;
-  backdrop-filter: blur(4px);
 }
 
 /* Analysis Modal */
 .analysis-modal {
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  @include modal-panel($radius: $radius-2xl, $shadow: $shadow-float);
   max-width: 600px;
   width: 90vw;
   max-height: 85vh;
@@ -41,12 +29,7 @@
 
 /* Header */
 .analysis-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  @include panel-header($background: $gradient-brand, $padding: 1.5rem, $radius-top: $radius-2xl);
 }
 
 .analysis-header h2 {
@@ -57,26 +40,7 @@
 }
 
 .close-btn {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  font-size: 1.75rem;
-  line-height: 1;
-  color: white;
-  cursor: pointer;
-  padding: 0;
-  width: 2rem;
-  height: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: all 0.2s;
-  backdrop-filter: blur(10px);
-}
-
-.close-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.1);
+  @include close-button-inverse($size: 2rem, $font-size: 1.75rem, $radius: $radius-md);
 }
 
 /* Body */
@@ -97,7 +61,7 @@
 .progress-bar {
   width: 100%;
   height: 8px;
-  background: #e9ecef;
+  background: $color-border;
   border-radius: 4px;
   overflow: hidden;
   position: relative;
@@ -124,7 +88,7 @@
 .progress-text {
   margin-top: 0.75rem;
   font-size: 0.9rem;
-  color: #6c757d;
+  color: $color-text-muted;
   font-weight: 500;
 }
 
@@ -136,18 +100,15 @@
 }
 
 .stat-card {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background: $color-bg;
   border-radius: 12px;
   padding: 1.25rem;
   display: flex;
   align-items: center;
   gap: 1rem;
   transition: transform 0.2s, box-shadow 0.2s;
-}
 
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  @include lift-hover($shadow: 0 4px 12px rgba(0, 0, 0, 0.1));
 }
 
 .stat-icon {
@@ -162,7 +123,7 @@
 
 .stat-label {
   font-size: 0.75rem;
-  color: #6c757d;
+  color: $color-text-muted;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 0.25rem;
@@ -171,7 +132,7 @@
 .stat-value {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #2d3748;
+  color: $color-text;
   animation: countUp 0.3s ease-out;
 }
 
@@ -188,7 +149,7 @@
 
 /* File Types Section */
 .file-types-section {
-  background: #f8f9fa;
+  background: $color-bg;
   border-radius: 12px;
   padding: 1.5rem;
 }
@@ -196,7 +157,7 @@
 .file-types-section h3 {
   font-size: 1rem;
   font-weight: 600;
-  color: #2d3748;
+  color: $color-text;
   margin: 0 0 1rem 0;
 }
 
@@ -213,7 +174,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 0.75rem;
-  background: white;
+  background: $color-surface;
   border-radius: 8px;
   transition: transform 0.2s;
   animation: slideInRight 0.3s ease-out;
@@ -242,13 +203,13 @@
 .file-type-ext {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #495057;
+  color: $color-text;
   min-width: 60px;
 }
 
 .file-type-count {
   font-size: 0.85rem;
-  color: #6c757d;
+  color: $color-text-muted;
   margin-left: auto;
 }
 
@@ -313,7 +274,7 @@
 /* Footer */
 .analysis-footer {
   padding: 1.5rem;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid $color-border;
   display: flex;
   justify-content: center;
 }
@@ -365,7 +326,7 @@
 }
 
 .close-modal-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: $gradient-brand;
   color: white;
 }
 
@@ -375,26 +336,9 @@
 }
 
 /* Scrollbar Styling */
-.analysis-body::-webkit-scrollbar,
-.file-types-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.analysis-body::-webkit-scrollbar-track,
-.file-types-list::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 3px;
-}
-
-.analysis-body::-webkit-scrollbar-thumb,
-.file-types-list::-webkit-scrollbar-thumb {
-  background: #cbd5e0;
-  border-radius: 3px;
-}
-
-.analysis-body::-webkit-scrollbar-thumb:hover,
-.file-types-list::-webkit-scrollbar-thumb:hover {
-  background: #a0aec0;
+.analysis-body,
+.file-types-list {
+  @include scrollbars($size: 6px, $track: #f1f1f1, $thumb: #cbd5e0, $thumb-hover: #a0aec0);
 }
 
 /* Responsive Design */

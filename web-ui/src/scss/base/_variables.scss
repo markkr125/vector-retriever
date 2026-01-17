@@ -23,6 +23,26 @@ $color-error: var(--error);
 $color-white: #ffffff;
 $color-black: #000000;
 
+// Common accents (compile-time)
+$color-warning: #ff9800;
+$color-warning-hover: #f57c00;
+
+// Success/high-risk accents (prefer theme consistency where possible)
+$color-success-accent: var(--secondary-color);
+$color-danger-accent: #ff5722;
+$color-danger-accent-hover: #f4511e;
+
+// Critical/error accents + soft status surfaces
+$color-critical-accent: #d32f2f;
+$color-critical-accent-hover: #c62828;
+$color-error-accent: var(--error, #f44336);
+
+$bg-success-soft: #f0fdf4;
+$text-success: #059669;
+$bg-warning-soft: #fff7ed;
+$bg-error-soft: #fef2f2;
+$bg-info-soft: #eef2ff;
+
 // Common translucent overlays
 $overlay-50: rgba(0, 0, 0, 0.5);
 $overlay-60: rgba(0, 0, 0, 0.6);

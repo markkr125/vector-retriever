@@ -181,3 +181,39 @@
 	}
 }
 
+@mixin accent-border-hover(
+	$accent: $color-warning,
+	$shadow-alpha: 0.2,
+	$shadow-y: 2px,
+	$shadow-blur: 8px
+) {
+	&:hover {
+		border-color: $accent;
+		box-shadow: 0 $shadow-y $shadow-blur rgba($accent, $shadow-alpha);
+	}
+}
+
+@mixin accent-solid-button(
+	$bg: $color-warning,
+	$bg-hover: $color-warning-hover,
+	$lift: -1px
+) {
+	background: $bg;
+	color: $color-white;
+
+	&:hover:not(:disabled) {
+		background: $bg-hover;
+		transform: translateY($lift);
+	}
+}
+
+@mixin lift-hover(
+	$y: -2px,
+	$shadow: 0 4px 12px rgba(0, 0, 0, 0.15)
+) {
+	&:hover:not(:disabled) {
+		transform: translateY($y);
+		box-shadow: $shadow;
+	}
+}
+
