@@ -27,11 +27,8 @@
   font-weight: 600;
   transition: all 0.2s;
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
-}
 
-.btn-visualize-results:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  @include lift-hover($shadow: 0 4px 12px rgba(59, 130, 246, 0.4));
 }
 
 .cluster-view-panel {
@@ -176,12 +173,11 @@
   font-weight: 600;
   transition: all 0.2s;
   white-space: nowrap;
+  @include lift-hover($y: -1px, $shadow: 0 2px 6px rgba(59, 130, 246, 0.4));
 }
 
 .btn-clear-filter:hover {
   background: #2563eb;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
 }
 
 .cluster-info {
@@ -284,10 +280,10 @@
 }
 
 .result-card.highlight {
-  animation: highlightPulse 0.6s ease-in-out;
+  animation: vr-highlight-pulse 0.6s ease-in-out;
 }
 
-@keyframes highlightPulse {
+@keyframes vr-highlight-pulse {
   0%, 100% {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   }
@@ -449,12 +445,11 @@
   transition: all 0.2s;
   white-space: nowrap;
   margin-left: 0.5rem;
+  @include lift-hover($y: -1px, $shadow: 0 3px 6px rgba(220, 38, 38, 0.4));
 }
 
 .clear-similar-btn:hover {
   background: #b91c1c;
-  transform: translateY(-1px);
-  box-shadow: 0 3px 6px rgba(220, 38, 38, 0.4);
 }
 
 .results-meta {
@@ -504,11 +499,7 @@
 .result-card {
   transition: all 0.3s;
   position: relative;
-}
-
-.result-card:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
+  @include lift-hover($y: -2px, $shadow: var(--shadow-md));
 }
 
 .result-card.source-document {
@@ -684,7 +675,7 @@
 .pii-warning-badge-inline.risk-critical {
   background: linear-gradient(135deg, $color-critical-accent, $color-critical-accent-hover);
   border-color: $color-critical-accent;
-  animation: pulse 2s infinite;
+  animation: vr-pulse 2s infinite;
 }
 
 .pii-warning-badge-inline .pii-icon {
@@ -735,11 +726,6 @@
   cursor: not-allowed;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.85; }
-}
-
 .doc-type-badges {
   display: flex;
   gap: 0.5rem;
@@ -761,12 +747,11 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  @include lift-hover($y: -2px, $shadow: 0 4px 12px rgba(66, 133, 244, 0.3));
 }
 
 .btn-scan-pii:hover:not(:disabled) {
   background: var(--primary-dark);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(66, 133, 244, 0.3);
 }
 
 .btn-scan-pii:disabled {
@@ -901,12 +886,11 @@
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+  @include lift-hover($y: -2px, $shadow: 0 4px 12px rgba(102, 126, 234, 0.4));
 }
 
 .btn-refresh:hover:not(:disabled) {
   background: linear-gradient(135deg, #5568d3, #6a4291);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
   color: white;
 }
 
@@ -927,22 +911,13 @@
   height: 16px;
   background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
   background-size: 200% 100%;
-  animation: loading 1.5s ease-in-out infinite;
+  animation: vr-shimmer 1.5s ease-in-out infinite;
   border-radius: 4px;
   margin-bottom: 0.75rem;
 }
 
 .skeleton-line.short {
   width: 70%;
-}
-
-@keyframes loading {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
 }
 
 .description-content {
@@ -1023,23 +998,33 @@
 
 .info-message {
   margin-bottom: 0.75rem;
-  padding: 0.75rem;
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid #3b82f6;
-  border-radius: 6px;
-  color: #3b82f6;
-  font-size: 0.85rem;
   line-height: 1.5;
+  @include status-banner(
+    $bg: rgba(59, 130, 246, 0.1),
+    $border-color: #3b82f6,
+    $text-color: #3b82f6,
+    $border-left: false,
+    $border-size: 1px,
+    $radius: 6px,
+    $padding: 0.75rem,
+    $font-size: 0.85rem,
+    $font-weight: 500
+  );
 }
 
 .error-message {
   margin-top: 0.75rem;
-  padding: 0.75rem;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid #ef4444;
-  border-radius: 6px;
-  color: #ef4444;
-  font-size: 0.9rem;
+  @include status-banner(
+    $bg: rgba(239, 68, 68, 0.1),
+    $border-color: #ef4444,
+    $text-color: #ef4444,
+    $border-left: false,
+    $border-size: 1px,
+    $radius: 6px,
+    $padding: 0.75rem,
+    $font-size: 0.9rem,
+    $font-weight: 500
+  );
 }
 
 /* Full Content Tab */

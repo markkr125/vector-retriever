@@ -181,6 +181,38 @@
 	}
 }
 
+@mixin button-base(
+	$padding: 0.6rem 1.2rem,
+	$radius: $radius-sm,
+	$font-size: 0.9rem,
+	$font-weight: 500,
+	$border: none,
+	$transition: all $transition
+) {
+	padding: $padding;
+	border: $border;
+	border-radius: $radius;
+	font-size: $font-size;
+	font-weight: $font-weight;
+	cursor: pointer;
+	transition: $transition;
+}
+
+@mixin input-base(
+	$padding: 0.5rem 1rem,
+	$radius: $radius-sm,
+	$font-size: 0.9rem,
+	$border-color: $color-border,
+	$background: $color-surface
+) {
+	padding: $padding;
+	border: 1px solid $border-color;
+	border-radius: $radius;
+	font-size: $font-size;
+	font-family: inherit;
+	background: $background;
+}
+
 @mixin accent-border-hover(
 	$accent: $color-warning,
 	$shadow-alpha: 0.2,
@@ -214,6 +246,41 @@
 	&:hover:not(:disabled) {
 		transform: translateY($y);
 		box-shadow: $shadow;
+	}
+}
+
+@mixin status-banner(
+	$bg,
+	$border-color,
+	$text-color: $color-text,
+	$border-left: true,
+	$border-width: 4px,
+	$border-size: 1px,
+	$radius: 8px,
+	$padding: 1rem,
+	$font-size: 0.95rem,
+	$font-weight: 500,
+	$layout: null,
+	$gap: 0.75rem,
+	$align: center
+) {
+	background: $bg;
+	color: $text-color;
+	border-radius: $radius;
+	padding: $padding;
+	font-size: $font-size;
+	font-weight: $font-weight;
+
+	@if $border-left {
+		border-left: $border-width solid $border-color;
+	} @else {
+		border: $border-size solid $border-color;
+	}
+
+	@if $layout == row {
+		display: flex;
+		align-items: $align;
+		gap: $gap;
 	}
 }
 

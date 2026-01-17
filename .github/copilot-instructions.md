@@ -176,6 +176,12 @@ Entry behavior is unchanged: `npm run server` runs `server.js`.
 **Notes:**
 - The project still uses CSS Custom Properties (CSS variables) in `:root` (see `web-ui/src/scss/base/_globals.scss`) for runtime theming.
 - Use SCSS primarily for file organization, partials, and reuse (mixins/functions) rather than replacing runtime theme tokens.
+- For repeated alert/status boxes (info/success/warning/error), prefer `@include status-banner(...)` from `web-ui/src/scss/base/_mixins.scss`.
+- For CSS animations/keyframes, prefer shared `vr-*` keyframes in `web-ui/src/scss/base/_animations.scss` (avoids global keyframe name collisions with Vue scoped styles).
+- For repeated “hover lift” interactions (translateY + shadow), prefer `@include lift-hover(...)` from `web-ui/src/scss/base/_mixins.scss`.
+- For repeated button base styling (padding/radius/font/cursor/transition), prefer `@include button-base(...)` from `web-ui/src/scss/base/_mixins.scss`.
+- For repeated form control styling (padding/border/radius/font/background), prefer `@include input-base(...)` from `web-ui/src/scss/base/_mixins.scss`.
+- For custom scrollbars, prefer `@include scrollbars(...)` from `web-ui/src/scss/base/_mixins.scss` (avoid hand-rolled `::-webkit-scrollbar` blocks).
 
 ### Collections System Architecture
 **Multi-tenant document isolation** - Each collection is a separate Qdrant collection with independent documents:

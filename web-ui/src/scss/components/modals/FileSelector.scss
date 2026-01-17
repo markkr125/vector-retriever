@@ -8,18 +8,7 @@
 .modal-content {
   @include modal-panel($radius: $radius-xl);
   box-shadow: $shadow-float;
-  animation: slideIn 0.3s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  animation: vr-slide-in 0.3s ease-out;
 }
 
 .file-selector-modal {
@@ -361,11 +350,7 @@
 .btn-confirm {
   background: $gradient-brand;
   color: white;
-}
-
-.btn-confirm:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+  @include lift-hover($y: -1px, $shadow: 0 4px 8px rgba(102, 126, 234, 0.3));
 }
 
 .btn-confirm:disabled {

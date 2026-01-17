@@ -39,13 +39,12 @@
   font-weight: 600;
   white-space: nowrap;
   box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+  @include lift-hover($y: -1px, $shadow: 0 3px 6px rgba(220, 38, 38, 0.4));
   flex-shrink: 0;
 }
 
 .clear-filter-btn:hover {
   background: #b91c1c;
-  transform: translateY(-1px);
-  box-shadow: 0 3px 6px rgba(220, 38, 38, 0.4);
 }
 
 .facet-btn {
