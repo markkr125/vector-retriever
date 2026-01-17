@@ -1889,5 +1889,5 @@ const handleClearFilter = async () => {
 }
 </script>
 
-<style scoped lang="scss" src="@/scss/components/App.scss"></style>
+<style scoped lang="scss" src="@/scss/components/layout/App.scss"></style>
 

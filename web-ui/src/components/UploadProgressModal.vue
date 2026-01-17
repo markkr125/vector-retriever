@@ -506,4 +506,4 @@ export default {
 };
 </script>
 
-<style scoped lang="scss" src="@/scss/components/UploadProgressModal.scss"></style>
+<style scoped lang="scss" src="@/scss/components/modals/UploadProgressModal.scss"></style>

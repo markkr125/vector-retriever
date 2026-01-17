@@ -53,6 +53,16 @@ Welcome to the Vector Retriever documentation! This folder contains comprehensiv
 
 ---
 
+### [SCSS Migration Workplan](SCSS_MIGRATION.md)
+**How the Web UI styling is organized (SCSS) and how to repeat the migration**
+- Folder structure (`scss/base`, `scss/components`, `scss/main.scss`)
+- Component style conventions (external SCSS files)
+- Step-by-step checklist and common pitfalls
+
+**Best for:** Making styling changes consistently and migrating similar projects.
+
+---
+
 ### [Mixed Dataset Guide](MIXED_DATASET.md)
 **Comprehensive guide to handling structured + unstructured documents**
 - Overview of mixed datasets

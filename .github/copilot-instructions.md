@@ -151,10 +151,11 @@ Entry behavior is unchanged: `npm run server` runs `server.js`.
 **CRITICAL:** All Vue components MUST keep styles in external files (no inline `<style>` blocks).
 
 **Rules for component creation/modification:**
-1. **Component SCSS location**: `web-ui/src/scss/components/ComponentName.scss`
-2. **Component reference**: Use external SCSS via `<style scoped lang="scss" src="@/scss/components/ComponentName.scss"></style>`
+1. **Component SCSS location**: `web-ui/src/scss/components/<domain>/ComponentName.scss` (organized by domain like `search/`, `modals/`, `sidebar/`, etc.)
+2. **Component reference**: Use external SCSS via `<style scoped lang="scss" src="@/scss/components/<domain>/ComponentName.scss"></style>`
 3. **Global styles**: Live under `web-ui/src/scss/base/` and are loaded via `web-ui/src/scss/main.scss` (imported by `web-ui/src/main.js`).
-4. **Shared patterns**: Prefer extracting repeated button/modal/badge patterns into a shared partial under `web-ui/src/scss/base/` and import it from `web-ui/src/scss/main.scss`.
+4. **Shared patterns**: Prefer extracting repeated patterns into `web-ui/src/scss/base/_mixins.scss` and shared tokens into `web-ui/src/scss/base/_variables.scss`.
+  - These are auto-injected into every SCSS file via Vite `css.preprocessorOptions.scss.additionalData`.
 
 **Example Vue component structure:**
 ```vue
@@ -166,7 +167,10 @@ Entry behavior is unchanged: `npm run server` runs `server.js`.
 // Component logic
 </script>
 
-<style scoped lang="scss" src="@/scss/components/ComponentName.scss"></style>
+<style scoped lang="scss" src="@/scss/components/<domain>/ComponentName.scss"></style>
+
+<!-- Example with domain folder -->
+<style scoped lang="scss" src="@/scss/components/modals/UploadModal.scss"></style>
 ```
 
 **Notes:**

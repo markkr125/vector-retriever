@@ -970,4 +970,4 @@ const handleSubmit = async () => {
 }
 </script>
 
-<style scoped lang="scss" src="@/scss/components/UploadModal.scss"></style>
+<style scoped lang="scss" src="@/scss/components/modals/UploadModal.scss"></style>

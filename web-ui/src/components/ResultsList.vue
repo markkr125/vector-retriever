@@ -1242,4 +1242,4 @@ onMounted(() => {
 })
 </script>
 
-<style scoped lang="scss" src="@/scss/components/ResultsList.scss"></style>
+<style scoped lang="scss" src="@/scss/components/search/ResultsList.scss"></style>

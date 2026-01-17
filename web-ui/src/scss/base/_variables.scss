@@ -1,3 +1,36 @@
-// SCSS design tokens live here.
-// This project currently uses CSS Custom Properties for runtime theming.
-// Prefer adding new tokens as CSS vars in `base/_globals.scss` unless you need compile-time Sass values.
+// Shared SCSS design tokens.
+//
+// This project primarily uses CSS Custom Properties for runtime theming.
+// These Sass variables provide a *single source of truth* for commonly used
+// var(--token) strings, radii, and layout constants.
+//
+// These tokens are auto-injected into every SCSS file via Vite
+// `css.preprocessorOptions.scss.additionalData`.
+
+// Brand / semantic colors (runtime via CSS variables)
+$color-primary: var(--primary-color);
+$color-primary-hover: var(--primary-hover);
+$color-secondary: var(--secondary-color);
+$color-bg: var(--background);
+$color-surface: var(--surface);
+$color-text: var(--text-primary);
+$color-text-muted: var(--text-secondary);
+$color-border: var(--border-color);
+$color-error: var(--error);
+
+// Shared radii (compile-time)
+$radius-sm: 4px;
+$radius-md: 6px;
+$radius-lg: 8px;
+$radius-xl: 12px;
+
+// Common shadows (runtime via CSS variables)
+$shadow-sm: var(--shadow-sm);
+$shadow-md: var(--shadow-md);
+$shadow-lg: var(--shadow-lg);
+
+// Z-index layers
+$z-modal: 2000;
+$z-dropdown: 1000;
+$z-toast: 9999;
+

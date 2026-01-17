@@ -541,4 +541,4 @@ export default {
 };
 </script>
 
-<style scoped lang="scss" src="@/scss/components/CollectionManagementModal.scss"></style>
+<style scoped lang="scss" src="@/scss/components/modals/CollectionManagementModal.scss"></style>

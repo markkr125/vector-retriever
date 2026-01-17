@@ -1,3 +1,76 @@
-// Shared mixins (media queries, reusable patterns)
-// Example:
-// @mixin focus-ring { outline: none; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+// Shared SCSS mixins (reusable patterns).
+//
+// These mixins are auto-injected into every SCSS file via Vite
+// `css.preprocessorOptions.scss.additionalData`.
+
+@use './variables' as *;
+
+@mixin truncate-one-line {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+@mixin focus-ring($ring-color: rgba(79, 70, 229, 0.2)) {
+	outline: none;
+	box-shadow: 0 0 0 3px $ring-color;
+}
+
+@mixin modal-overlay(
+	$z: $z-modal,
+	$bg: rgba(0, 0, 0, 0.5),
+	$blur: 4px
+) {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: $bg;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: $z;
+
+	@if $blur != 0 {
+		backdrop-filter: blur($blur);
+	}
+}
+
+@mixin modal-panel(
+	$bg: $color-surface,
+	$radius: $radius-xl,
+	$shadow: $shadow-lg
+) {
+	background: $bg;
+	border-radius: $radius;
+	box-shadow: $shadow;
+	border: 1px solid $color-border;
+}
+
+@mixin scrollbars(
+	$size: 8px,
+	$track: #f1f1f1,
+	$thumb: #bdc3c7,
+	$thumb-hover: #95a5a6
+) {
+	&::-webkit-scrollbar {
+		width: $size;
+		height: $size;
+	}
+
+	&::-webkit-scrollbar-track {
+		background: $track;
+		border-radius: calc($size / 2);
+	}
+
+	&::-webkit-scrollbar-thumb {
+		background: $thumb;
+		border-radius: calc($size / 2);
+	}
+
+	&::-webkit-scrollbar-thumb:hover {
+		background: $thumb-hover;
+	}
+}
+

@@ -1,32 +1,19 @@
 .modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  backdrop-filter: blur(4px);
+  @include modal-overlay($z: $z-modal);
 }
 
 .modal-dialog {
-  background: var(--surface, #ffffff);
-  border-radius: 12px;
+  @include modal-panel($radius: $radius-xl);
   width: 90%;
   max-width: 700px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--shadow-lg, 0 20px 25px -5px rgba(0, 0, 0, 0.1));
-  border: 1px solid var(--border-color, #e5e7eb);
 }
 
 .modal-header {
   padding: 1.5rem;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  border-bottom: 1px solid $color-border;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -35,7 +22,7 @@
 .modal-header h2 {
   margin: 0;
   font-size: 1.5rem;
-  color: var(--text-primary, #111827);
+  color: $color-text;
 }
 
 .header-actions {

@@ -14,16 +14,17 @@ All Web UI styles live under `web-ui/src/scss/`:
   - Global SCSS entrypoint imported by `web-ui/src/main.js`.
 - `web-ui/src/scss/base/`
   - `_globals.scss`: resets, `:root` CSS variables, global utility classes.
-  - `_variables.scss`: optional Sass tokens (compile-time values only).
-  - `_mixins.scss`: shared mixins.
+   - `_variables.scss`: shared Sass tokens (often wrappers around CSS vars).
+   - `_mixins.scss`: shared mixins.
 - `web-ui/src/scss/components/`
-  - `ComponentName.scss`: per-component styles.
+   - Subfolders by domain (`search/`, `modals/`, `sidebar/`, etc.).
+   - `.../ComponentName.scss`: per-component styles.
 
 ## Component Convention
-Each component keeps its style file in `web-ui/src/scss/components/` and references it from the Vue SFC:
+Each component keeps its style file in `web-ui/src/scss/components/**/` and references it from the Vue SFC:
 
 ```vue
-<style scoped lang="scss" src="@/scss/components/ComponentName.scss"></style>
+<style scoped lang="scss" src="@/scss/components/<domain>/ComponentName.scss"></style>
 ```
 
 Why this pattern:
@@ -71,7 +72,7 @@ If you need to do this in another repo (or redo it cleanly), follow this order:
 - Don’t convert runtime CSS variables into Sass variables unless you truly want compile-time-only theming.
 
 ## Optional Improvements (nice-to-have)
-- Auto-inject shared mixins/variables using Vite `css.preprocessorOptions.scss.additionalData`.
-  - This removes the need to manually `@use` shared partials in every component.
+- Shared mixins/variables are already auto-injected via Vite `css.preprocessorOptions.scss.additionalData`.
+   - This removes the need to manually `@use` the base partials in every component file.
 - Split `_globals.scss` further if it grows:
   - `_reset.scss`, `_tokens.scss`, `_utilities.scss`, `_animations.scss`.

@@ -97,4 +97,4 @@ watch(() => props.visible, (newVal) => {
 })
 </script>
 
-<style scoped lang="scss" src="@/scss/components/ScanNotification.scss"></style>
+<style scoped lang="scss" src="@/scss/components/notifications/ScanNotification.scss"></style>

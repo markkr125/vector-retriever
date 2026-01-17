@@ -193,4 +193,4 @@ const downloadReport = () => {
 }
 </script>
 
-<style scoped lang="scss" src="@/scss/components/PIIDetailsModal.scss"></style>
+<style scoped lang="scss" src="@/scss/components/modals/PIIDetailsModal.scss"></style>
