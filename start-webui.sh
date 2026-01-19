@@ -44,12 +44,28 @@ echo "🔧 Starting API server..."
 node server.js &
 API_PID=$!
 
-# Wait for API server to start
-sleep 3
+# Wait for API server to start (model probing + collection init may take a bit)
+API_HEALTH_URL="http://localhost:3001/api/health"
+API_STARTED=false
 
-# Check if API server is running
-if ! curl -s http://localhost:3001/api/health > /dev/null; then
-    echo "❌ Error: API server failed to start"
+for i in {1..60}; do
+    # If the process already exited, fail fast
+    if ! kill -0 $API_PID 2>/dev/null; then
+        echo "❌ Error: API server process exited during startup"
+        exit 1
+    fi
+
+    if curl -fsS "$API_HEALTH_URL" > /dev/null 2>&1; then
+        API_STARTED=true
+        break
+    fi
+
+    sleep 0.5
+done
+
+if [ "$API_STARTED" != "true" ]; then
+    echo "❌ Error: API server failed to become healthy at $API_HEALTH_URL"
+    echo "   Common causes: port 3001 already in use, Qdrant/Ollama not reachable, or slow model init."
     kill $API_PID 2>/dev/null
     exit 1
 fi

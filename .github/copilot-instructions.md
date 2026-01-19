@@ -990,6 +990,14 @@ curl http://localhost:6333/collections  # Qdrant health
 curl http://localhost:11434/api/tags    # Ollama models
 ```
 
+### Switching embedding models (vector size)
+Dense vector size is now auto-detected from the configured Ollama embedding model by probing `POST /api/embed` once at startup and using `embeddings[0].length`.
+
+- Server path: `services/embedding-service.js` (`fetchEmbeddingDimension()`), wired into collection creation via `CollectionMetadataService`.
+- CLI path: `index.js` probes once during `initializeCollection()`.
+
+If you change `EMBEDDING_MODEL`, you must recreate/re-embed the Qdrant collections (vector dimension is part of the schema).
+
 ### Visualization slow/hanging
 UMAP reduction is CPU-intensive (no GPU support in umap-js). Expected: ~10s for 100 docs. Use caching!
 

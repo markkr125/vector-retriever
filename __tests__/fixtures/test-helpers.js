@@ -1,11 +1,26 @@
 const { QdrantClient } = require('@qdrant/js-client-rest');
 
+function getTestDenseVectorSize(documents = []) {
+  const envValue = process.env.TEST_EMBEDDING_DIM;
+  if (envValue) {
+    const parsed = parseInt(envValue, 10);
+    if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  }
+
+  for (const doc of documents) {
+    if (Array.isArray(doc?.vector) && doc.vector.length > 0) return doc.vector.length;
+    if (Array.isArray(doc?.vector?.dense) && doc.vector.dense.length > 0) return doc.vector.dense.length;
+  }
+
+  throw new Error('Missing test embedding dimension. Set TEST_EMBEDDING_DIM in the environment or pass documents with vectors.');
+}
+
 /**
  * Setup a test collection with sample data
  * @param {string} collectionName - Name of the test collection
  * @returns {Promise<string>} - Collection name
  */
-async function setupTestCollection(collectionName = 'test_collection') {
+async function setupTestCollection(collectionName = 'test_collection', options = {}) {
   const client = new QdrantClient({ url: process.env.QDRANT_URL || 'http://localhost:6333' });
   
   try {
@@ -18,11 +33,13 @@ async function setupTestCollection(collectionName = 'test_collection') {
       // Collection doesn't exist, that's fine
     }
 
+    const denseVectorSize = getTestDenseVectorSize(options.documents);
+
     // Create collection with hybrid vectors
     await client.createCollection(collectionName, {
       vectors: {
         dense: { 
-          size: 768, 
+          size: denseVectorSize, 
           distance: 'Cosine' 
         }
       },
@@ -63,11 +80,13 @@ async function setupTestCollection(collectionName = 'test_collection') {
  */
 async function insertTestDocuments(collectionName, documents) {
   const client = new QdrantClient({ url: process.env.QDRANT_URL || 'http://localhost:6333' });
+
+  const denseVectorSize = getTestDenseVectorSize(documents);
   
   const points = documents.map((doc, index) => ({
     id: doc.id || index + 1,
     vector: {
-      dense: doc.vector || Array(768).fill(0).map(() => Math.random()),
+      dense: doc.vector || Array(denseVectorSize).fill(0).map(() => Math.random()),
       sparse: doc.sparse || {
         indices: [1234, 5678],
         values: [2, 1]
