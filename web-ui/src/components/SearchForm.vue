@@ -290,12 +290,12 @@ const availableLocations = computed(() => props.stats?.locations || [])
 // By-document upload config (vision-enabled images)
 const visionEnabled = ref(false)
 const supportedImageTypes = ref([])
-const acceptFileTypes = ref('.txt,.md,.pdf,.docx')
+const acceptFileTypes = ref('.txt,.md,.pdf,.docx,.csv,.xlsx,.pptx,.rtf')
 
 const byDocumentHint = computed(() => {
-  return visionEnabled.value && supportedImageTypes.value.length > 0
-    ? 'Supports: TXT, MD, PDF, DOCX, Images'
-    : 'Supports: TXT, MD, PDF, DOCX'
+  // Extract unique base types from acceptFileTypes
+  const types = acceptFileTypes.value.split(',').map(t => t.replace('.', '').toUpperCase())
+  return `Supports: ${types.join(', ')}`
 })
 
 const fetchConfig = async () => {
@@ -306,16 +306,22 @@ const fetchConfig = async () => {
     visionEnabled.value = Boolean(data.visionEnabled)
     supportedImageTypes.value = Array.isArray(data.supportedImageTypes) ? data.supportedImageTypes : []
 
-    let types = '.txt,.md,.pdf,.docx'
-    if (visionEnabled.value && supportedImageTypes.value.length > 0) {
-      types += ',' + supportedImageTypes.value.join(',')
+    // Use backend-provided supported types for by-document search
+    if (data.supportedByDocumentFileTypes && Array.isArray(data.supportedByDocumentFileTypes)) {
+      acceptFileTypes.value = data.supportedByDocumentFileTypes.join(',')
+    } else {
+      // Fallback to default with vision support
+      let types = '.txt,.md,.pdf,.docx,.csv,.xlsx,.pptx,.rtf'
+      if (visionEnabled.value && supportedImageTypes.value.length > 0) {
+        types += ',' + supportedImageTypes.value.join(',')
+      }
+      acceptFileTypes.value = types
     }
-    acceptFileTypes.value = types
   } catch {
     // Keep defaults on failure
     visionEnabled.value = false
     supportedImageTypes.value = []
-    acceptFileTypes.value = '.txt,.md,.pdf,.docx'
+    acceptFileTypes.value = '.txt,.md,.pdf,.docx,.csv,.xlsx,.pptx,.rtf'
   }
 }
 

@@ -2,6 +2,7 @@ const { parseMetadataFromContent } = require('../utils/metadata');
 const { pdfToMarkdownViaHtml, processPdfText } = require('../utils/pdf-utils');
 const { getSparseVector, simpleHash } = require('../utils/text-utils');
 const { throwIfAborted } = require('./ollama-agent');
+const { extractCSV, extractXLSX, extractPPTX, extractRTF } = require('../utils/office-extractors');
 
 function createDocumentService({
   qdrantClient,
@@ -10,6 +11,7 @@ function createDocumentService({
   categorizationService,
   visionService,
   descriptionService,
+  libreOfficeConverter,
   pdfParse,
   pdf2md,
   mammoth,
@@ -114,14 +116,89 @@ function createDocumentService({
         console.log('DOCX converted to markdown successfully');
         break;
 
-      case 'doc':
-        reportStage('Extracting DOC text…');
-        // Note: .doc files are harder to parse, mammoth primarily supports .docx
-        // Attempting to parse as docx format and convert to markdown
-        const docResult = await mammoth.convertToMarkdown({ buffer: file.buffer });
-        content = docResult.value;
-        console.log('DOC converted to markdown successfully');
+      case 'csv':
+        reportStage('Extracting CSV data…');
+        const csvResult = await extractCSV(
+          file.buffer,
+          (text) => embeddingService.estimateTokenCount(text),
+          embeddingService.getModelMaxContextTokens()
+        );
+        content = csvResult.content;
+        metadata = { ...metadata, ...csvResult.metadata };
+        console.log('✓ CSV extracted successfully');
         break;
+
+      case 'xlsx':
+        reportStage('Extracting XLSX data…');
+        const xlsxResult = await extractXLSX(
+          file.buffer,
+          (text) => embeddingService.estimateTokenCount(text),
+          embeddingService.getModelMaxContextTokens()
+        );
+        content = xlsxResult.content;
+        metadata = { ...metadata, ...xlsxResult.metadata };
+        console.log('✓ XLSX extracted successfully');
+        break;
+
+      case 'pptx':
+        reportStage('Extracting PPTX slides…');
+        const pptxResult = await extractPPTX(
+          file.buffer,
+          (text) => embeddingService.estimateTokenCount(text),
+          embeddingService.getModelMaxContextTokens()
+        );
+        content = pptxResult.content;
+        metadata = { ...metadata, ...pptxResult.metadata };
+        console.log('✓ PPTX extracted successfully');
+        break;
+
+      case 'rtf':
+        reportStage('Extracting RTF text…');
+        const rtfResult = await extractRTF(file.buffer);
+        content = rtfResult.content;
+        metadata = { ...metadata, ...rtfResult.metadata };
+        console.log('✓ RTF extracted successfully');
+        break;
+
+      // Legacy Office formats - require LibreOffice conversion
+      case 'doc':
+      case 'ppt':
+      case 'xls':
+        reportStage(`Converting legacy ${fileExt.toUpperCase()}…`);
+        if (!libreOfficeConverter || !libreOfficeConverter.isEnabled()) {
+          throw new Error(`Legacy .${fileExt} files require LibreOffice conversion. Set LIBREOFFICE_ENABLED=true in .env to enable support.`);
+        }
+        
+        const legacyConverted = await libreOfficeConverter.convert(file.buffer, fileExt);
+        
+        // Recursively process the converted file
+        const legacyFile = {
+          originalname: filename.replace(`.${fileExt}`, `.${legacyConverted.ext}`),
+          buffer: legacyConverted.buffer
+        };
+        
+        const legacyResult = await processSingleFile(legacyFile, collectionName, autoCategorize, options);
+        return legacyResult;
+
+      // OpenDocument formats - require LibreOffice conversion
+      case 'odt':
+      case 'odp':
+      case 'ods':
+        reportStage(`Converting ${fileExt.toUpperCase()}…`);
+        if (!libreOfficeConverter || !libreOfficeConverter.isEnabled()) {
+          throw new Error(`OpenDocument .${fileExt} files require LibreOffice conversion. Set LIBREOFFICE_ENABLED=true in .env to enable support.`);
+        }
+        
+        const odfConverted = await libreOfficeConverter.convert(file.buffer, fileExt);
+        
+        // Recursively process the converted file
+        const odfFile = {
+          originalname: filename.replace(`.${fileExt}`, `.${odfConverted.ext}`),
+          buffer: odfConverted.buffer
+        };
+        
+        const odfResult = await processSingleFile(odfFile, collectionName, autoCategorize, options);
+        return odfResult;
 
       case 'jpg':
       case 'jpeg':
@@ -155,7 +232,14 @@ function createDocumentService({
         break;
 
       default:
-        throw new Error(`Unsupported file type: ${fileExt}. Supported: txt, json, pdf, docx, doc${visionEnabled ? ', jpg, jpeg, png, gif, webp, bmp' : ''}`);
+        const supportedTypes = ['txt', 'json', 'pdf', 'docx', 'csv', 'xlsx', 'pptx', 'rtf'];
+        if (visionEnabled) {
+          supportedTypes.push('jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp');
+        }
+        if (libreOfficeConverter && libreOfficeConverter.isEnabled()) {
+          supportedTypes.push('doc', 'ppt', 'xls', 'odt', 'odp', 'ods');
+        }
+        throw new Error(`Unsupported file type: ${fileExt}. Supported: ${supportedTypes.join(', ')}`);
     }
 
     if (!content || content.trim().length === 0) {
@@ -383,8 +467,54 @@ function createDocumentService({
       // Use markdown conversion for better structure preservation
       const result = await mammoth.convertToMarkdown({ buffer: fileBuffer });
       content = result.value;
+    } else if (fileExt === 'csv') {
+      // CSV extraction
+      const csvResult = await extractCSV(
+        fileBuffer,
+        (text) => embeddingService.estimateTokenCount(text),
+        embeddingService.getModelMaxContextTokens()
+      );
+      content = csvResult.content;
+    } else if (fileExt === 'xlsx') {
+      // XLSX extraction
+      const xlsxResult = await extractXLSX(
+        fileBuffer,
+        (text) => embeddingService.estimateTokenCount(text),
+        embeddingService.getModelMaxContextTokens()
+      );
+      content = xlsxResult.content;
+    } else if (fileExt === 'pptx') {
+      // PPTX extraction
+      const pptxResult = await extractPPTX(
+        fileBuffer,
+        (text) => embeddingService.estimateTokenCount(text),
+        embeddingService.getModelMaxContextTokens()
+      );
+      content = pptxResult.content;
+    } else if (fileExt === 'rtf') {
+      // RTF extraction
+      const rtfResult = await extractRTF(fileBuffer);
+      content = rtfResult.content;
+    } else if (['doc', 'ppt', 'xls', 'odt', 'odp', 'ods'].includes(fileExt)) {
+      // Legacy/ODF formats require LibreOffice
+      if (!libreOfficeConverter || !libreOfficeConverter.isEnabled()) {
+        const err = new Error(`Legacy/OpenDocument .${fileExt} files require LibreOffice conversion. Set LIBREOFFICE_ENABLED=true in .env to enable support.`);
+        err.code = 'UNSUPPORTED_FILE_TYPE';
+        throw err;
+      }
+      
+      // Convert and recursively extract
+      const converted = await libreOfficeConverter.convert(fileBuffer, fileExt);
+      return extractContentForSearchByDocument({
+        fileBuffer: converted.buffer,
+        filename: filename.replace(`.${fileExt}`, `.${converted.ext}`)
+      });
     } else {
-      const err = new Error(`Unsupported file type: ${fileExt}. Supported: txt, md, pdf, docx`);
+      const supportedTypes = ['txt', 'md', 'pdf', 'docx', 'csv', 'xlsx', 'pptx', 'rtf'];
+      if (libreOfficeConverter && libreOfficeConverter.isEnabled()) {
+        supportedTypes.push('doc', 'ppt', 'xls', 'odt', 'odp', 'ods');
+      }
+      const err = new Error(`Unsupported file type: ${fileExt}. Supported: ${supportedTypes.join(', ')}`);
       err.code = 'UNSUPPORTED_FILE_TYPE';
       throw err;
     }

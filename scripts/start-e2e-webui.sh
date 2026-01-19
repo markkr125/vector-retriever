@@ -23,6 +23,11 @@ export VISION_MODEL
 export DESCRIPTION_MODEL
 export PII_DETECTION_ENABLED
 
+# Vite uses chokidar; some CI/dev environments have low watcher / fd limits
+# which can crash the dev server with EMFILE. Polling avoids OS watch handles.
+export CHOKIDAR_USEPOLLING=${CHOKIDAR_USEPOLLING:-1}
+export CHOKIDAR_INTERVAL=${CHOKIDAR_INTERVAL:-1000}
+
 MOCK_PID=""
 
 cleanup() {

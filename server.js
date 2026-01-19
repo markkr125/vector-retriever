@@ -57,6 +57,12 @@ const DESCRIPTION_MODEL = process.env.DESCRIPTION_MODEL || CATEGORIZATION_MODEL 
 const SUPPORTED_IMAGE_TYPES = process.env.SUPPORTED_IMAGE_TYPES || '.jpg,.jpeg,.png,.gif,.webp,.bmp';
 const AUTO_GENERATE_DESCRIPTION = process.env.AUTO_GENERATE_DESCRIPTION !== 'false';
 
+// LibreOffice Conversion (optional - legacy Office and OpenDocument formats)
+const LIBREOFFICE_ENABLED = (process.env.LIBREOFFICE_ENABLED || 'false').toLowerCase() === 'true';
+const LIBREOFFICE_PATH = process.env.LIBREOFFICE_PATH || '';
+const LIBREOFFICE_TIMEOUT_MS = parseInt(process.env.LIBREOFFICE_TIMEOUT_MS || '60000', 10);
+const LIBREOFFICE_MAX_CONCURRENCY = parseInt(process.env.LIBREOFFICE_MAX_CONCURRENCY || '2', 10);
+
 // Configure multer for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -142,6 +148,21 @@ const VIZ_CACHE_STRATEGY = process.env.VIZ_CACHE_STRATEGY || 'memory';
 const visualizationService = new VisualizationService(qdrantClient, COLLECTION_NAME, VIZ_CACHE_STRATEGY);
 console.log(`Visualization cache strategy: ${VIZ_CACHE_STRATEGY}`);
 
+// LibreOffice converter
+const { createLibreOfficeConverter } = require('./services/libreoffice-converter');
+const libreOfficeConverter = createLibreOfficeConverter({
+  enabled: LIBREOFFICE_ENABLED,
+  libreOfficePath: LIBREOFFICE_PATH,
+  timeoutMs: LIBREOFFICE_TIMEOUT_MS,
+  maxConcurrency: LIBREOFFICE_MAX_CONCURRENCY
+});
+
+if (LIBREOFFICE_ENABLED) {
+  console.log(`LibreOffice conversion enabled (timeout: ${LIBREOFFICE_TIMEOUT_MS}ms, max concurrency: ${LIBREOFFICE_MAX_CONCURRENCY})`);
+} else {
+  console.log('LibreOffice conversion disabled (legacy Office and OpenDocument formats not supported)');
+}
+
 // Document processing
 const { createDocumentService } = require('./services/document-service');
 const documentService = createDocumentService({
@@ -151,6 +172,7 @@ const documentService = createDocumentService({
   categorizationService,
   visionService,
   descriptionService,
+  libreOfficeConverter,
   pdfParse,
   pdf2md,
   mammoth,
@@ -176,6 +198,7 @@ app.use(
     visionEnabled: VISION_MODEL_ENABLED,
     visionModel: VISION_MODEL,
     supportedImageTypes: SUPPORTED_IMAGE_TYPES.split(','),
+    libreOfficeEnabled: LIBREOFFICE_ENABLED,
     qdrantClient
   })
 );

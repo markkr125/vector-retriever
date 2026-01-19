@@ -1120,7 +1120,60 @@ app.get('/api/upload-jobs/active', ...)     // Never reached
 **General Rule:** Specific → General (most specific routes first, dynamic routes last)
 
 ## File Upload Processing
-Supports: `.txt`, `.pdf`, `.docx`, `.html`, `.md`
+**Modern formats (pure JS):** `.txt`, `.json`, `.pdf`, `.docx`, `.csv`, `.xlsx`, `.pptx`, `.rtf`
+**Legacy/ODF (requires LibreOffice):** `.doc`, `.ppt`, `.xls`, `.odt`, `.odp`, `.ods`
+**Images (requires vision):** `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.bmp`
+
+### Modern Office File Support
+Added in Node 18+ with pure-JS parsing libraries:
+
+**CSV (`.csv`):**
+- Library: `csv-parse`
+- Output: Markdown table with header + rows
+- Truncation: Stops at token limit, stores `included_rows`, `total_rows`, `content_truncated`
+- Error: Rejects if even header + 1 row can't fit
+
+**Excel (`.xlsx`):**
+- Library: `xlsx` (SheetJS)
+- Output: `# Sheet: <name>` + row tables per sheet
+- Truncation: Stops at token limit, stores `included_sheets`, `included_rows`, `total_sheets`, `content_truncated`
+- Error: Rejects if even one sheet with one row can't fit
+
+**PowerPoint (`.pptx`):**
+- Library: `jszip` + `fast-xml-parser`
+- Extraction: Slides + speaker notes via `ppt/slides/_rels/slide*.xml.rels` → `ppt/notesSlides/notesSlide*.xml`
+- Output: `# Slide N` + slide text + `## Speaker Notes` per slide
+- Truncation: Stops at token limit, stores `included_slides`, `included_notes_slides`, `total_slides`, `content_truncated`
+- Error: Rejects if even one slide can't fit
+
+**RTF (`.rtf`):**
+- Library: `rtf-parser`
+- Output: Plain text extraction
+- Metadata: `document_type: 'rtf'`
+
+### Legacy Office & OpenDocument Support (Optional)
+**Env flags:**
+- `LIBREOFFICE_ENABLED=true` - Enable legacy/ODF conversion
+- `LIBREOFFICE_PATH=` - Optional path to soffice binary (auto-detected)
+- `LIBREOFFICE_TIMEOUT_MS=60000` - Conversion timeout (default 60s)
+- `LIBREOFFICE_MAX_CONCURRENCY=2` - Max concurrent conversions
+
+**Conversion strategy:**
+- `.doc` → `.docx` (then mammoth)
+- `.ppt` → `.pdf` (then PDF extraction)
+- `.xls` → `.csv` (then CSV parsing)
+- `.odt` → `.docx`
+- `.odp` → `.pdf`
+- `.ods` → `.csv`
+
+**Implementation:** `services/libreoffice-converter.js`
+- Uses `spawn()` with strict timeouts
+- Concurrency-limited (protects CPU/RAM)
+- Clear error when disabled: "Set LIBREOFFICE_ENABLED=true in .env to enable support"
+
+**Extraction utilities:** `utils/office-extractors.js`
+- All extractors accept `(buffer, estimateTokens, maxTokens)` for truncation
+- Return `{ content, metadata }` with truncation details
 
 ### Image Upload + Vision Processing
 Supports (when enabled): `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.bmp`
@@ -1294,6 +1347,12 @@ MAX_FILE_SIZE_MB=10
 
 # Optional Auto-Categorization
 CATEGORIZATION_MODEL=        # e.g., llama3.2:latest for LLM-based metadata extraction
+
+# LibreOffice Conversion (optional - for legacy Office and OpenDocument formats)
+LIBREOFFICE_ENABLED=false    # Enable .doc, .ppt, .xls, .odt, .odp, .ods support
+LIBREOFFICE_PATH=            # Optional: path to soffice binary (auto-detected)
+LIBREOFFICE_TIMEOUT_MS=60000 # Conversion timeout (default: 60 seconds)
+LIBREOFFICE_MAX_CONCURRENCY=2 # Max concurrent conversions (default: 2)
 ```
 
 **Recommended PII Methods:**

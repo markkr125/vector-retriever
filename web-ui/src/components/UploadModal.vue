@@ -484,7 +484,7 @@ const maxFileSizeMB = ref(10) // Default value
 const categorizationEnabled = ref(false)
 const visionEnabled = ref(false)
 const supportedImageTypes = ref([])
-const acceptFileTypes = ref('.txt,.json,.pdf,.doc,.docx')
+const acceptFileTypes = ref('.txt,.json,.pdf,.docx,.csv,.xlsx,.pptx,.rtf')
 const autoCategorize = ref(false)
 
 // Cloud import state
@@ -669,12 +669,17 @@ const fetchConfig = async () => {
     visionEnabled.value = response.data.visionEnabled || false
     supportedImageTypes.value = response.data.supportedImageTypes || []
     
-    // Build accept file types dynamically
-    let baseTypes = '.txt,.json,.pdf,.doc,.docx'
-    if (visionEnabled.value && supportedImageTypes.value.length > 0) {
-      baseTypes += ',' + supportedImageTypes.value.join(',')
+    // Build accept file types from backend config
+    if (response.data.supportedUploadFileTypes) {
+      acceptFileTypes.value = response.data.supportedUploadFileTypes.join(',')
+    } else {
+      // Fallback to default
+      let baseTypes = '.txt,.json,.pdf,.docx,.csv,.xlsx,.pptx,.rtf'
+      if (visionEnabled.value && supportedImageTypes.value.length > 0) {
+        baseTypes += ',' + supportedImageTypes.value.join(',')
+      }
+      acceptFileTypes.value = baseTypes
     }
-    acceptFileTypes.value = baseTypes
     
     // Default to checked if enabled
     if (categorizationEnabled.value) {
