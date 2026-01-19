@@ -168,7 +168,19 @@ function getMimeType(filename) {
     png: 'image/png',
     gif: 'image/gif',
     webp: 'image/webp',
-    bmp: 'image/bmp'
+    bmp: 'image/bmp',
+    // Modern Office formats
+    csv: 'text/csv',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    rtf: 'application/rtf',
+    // Legacy Office formats
+    xls: 'application/vnd.ms-excel',
+    ppt: 'application/vnd.ms-powerpoint',
+    // OpenDocument formats
+    odt: 'application/vnd.oasis.opendocument.text',
+    ods: 'application/vnd.oasis.opendocument.spreadsheet',
+    odp: 'application/vnd.oasis.opendocument.presentation'
   };
   return mimeTypes[ext] || 'application/octet-stream';
 }

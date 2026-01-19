@@ -118,6 +118,20 @@ Welcome to the Vector Retriever documentation! This folder contains comprehensiv
 
 ---
 
+### [Office File Support](OFFICE_FILE_SUPPORT.md)
+**Modern Office formats + optional LibreOffice conversion**
+- Supported formats (CSV, XLSX, PPTX, RTF, DOC, PPT, XLS, ODF)
+- Pure JavaScript extraction (modern formats)
+- LibreOffice conversion setup (legacy formats)
+- Token-limit truncation strategies
+- Extraction metadata fields
+- Configuration and troubleshooting
+- Security considerations
+
+**Best for:** Understanding Office file support, configuring LibreOffice, and troubleshooting file upload issues.
+
+---
+
 ### [Collection Rename Feature](COLLECTION_RENAME.md)
 **Inline collection renaming with validation**
 - Backend API and service implementation

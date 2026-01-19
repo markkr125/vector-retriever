@@ -665,27 +665,7 @@ function createSearchRoutes({
       const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
 
       try {
-        if (fileExt === 'txt' || fileExt === 'md') {
-          content = fileBuffer.toString('utf-8');
-        } else if (fileExt === 'pdf') {
-          // Use the same PDF extraction logic as the main upload
-          try {
-            content = await pdfToMarkdownViaHtml(fileBuffer);
-          } catch (htmlError) {
-            console.warn('PDF via HTML conversion failed, trying @opendocsg/pdf2md:', htmlError.message);
-            try {
-              content = await pdf2md(fileBuffer);
-            } catch (pdf2mdError) {
-              console.warn('pdf2md failed, using basic text extraction:', pdf2mdError.message);
-              const pdfData = await pdfParse(fileBuffer);
-              content = processPdfText(pdfData.text);
-            }
-          }
-        } else if (fileExt === 'docx') {
-          // Use markdown conversion for better structure preservation
-          const result = await mammoth.convertToMarkdown({ buffer: fileBuffer });
-          content = result.value;
-        } else if (imageExtensions.includes(fileExt)) {
+        if (imageExtensions.includes(fileExt)) {
           // Process image with vision model if available
           if (!documentService.visionService) {
             return res.status(400).json({
@@ -700,14 +680,23 @@ function createSearchRoutes({
           content = visionResult.markdownContent;
           console.log(`✓ Image processed, extracted ${content.length} characters`);
         } else {
-          const supportedFormats = documentService.visionService 
-            ? 'txt, md, pdf, docx, jpg, jpeg, png, gif, webp, bmp'
-            : 'txt, md, pdf, docx';
-          return res.status(400).json({
-            error: `Unsupported file type: ${fileExt}. Supported: ${supportedFormats}`
+          if (!documentService || typeof documentService.extractContentForSearchByDocument !== 'function') {
+            throw new Error('Document extraction service is not configured');
+          }
+
+          const extracted = await documentService.extractContentForSearchByDocument({
+            fileBuffer,
+            filename
           });
+          content = extracted.content;
         }
       } catch (extractError) {
+        if (extractError && extractError.code === 'UNSUPPORTED_FILE_TYPE') {
+          return res.status(400).json({
+            error: extractError.message
+          });
+        }
+
         console.error('Text extraction error:', extractError);
         return res.status(500).json({
           error: 'Failed to extract text from file',

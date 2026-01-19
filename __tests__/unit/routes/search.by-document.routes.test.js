@@ -103,4 +103,36 @@ describe('search by-document route (unit)', () => {
 
     expect(res.body.message).toMatch(/VISION_MODEL_ENABLED=true/i);
   });
+
+  test('uses documentService.extractContentForSearchByDocument for non-image uploads (e.g. CSV)', async () => {
+    const documentService = {
+      visionService: null,
+      extractContentForSearchByDocument: jest.fn(async () => ({
+        content: 'Name,Age\nAlice,30',
+        fileExt: 'csv'
+      }))
+    };
+
+    const { app, embeddingService, qdrantClient } = makeApp({ documentService });
+
+    const res = await request(app)
+      .post('/api/search/by-document')
+      .field('limit', '10')
+      .attach('file', Buffer.from('Name,Age\nAlice,30'), {
+        filename: 'test.csv',
+        contentType: 'text/csv'
+      })
+      .expect(200);
+
+    expect(documentService.extractContentForSearchByDocument).toHaveBeenCalledWith({
+      fileBuffer: expect.any(Buffer),
+      filename: 'test.csv'
+    });
+    expect(embeddingService.getDenseEmbedding).toHaveBeenCalledWith('Name,Age\nAlice,30');
+    expect(qdrantClient.search).toHaveBeenCalledTimes(1);
+
+    expect(res.body.searchType).toBe('by-document');
+    expect(res.body.sourceFile).toBe('test.csv');
+    expect(res.body.results).toHaveLength(2);
+  });
 });
