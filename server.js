@@ -76,12 +76,6 @@ startTempFileCleanup();
 const { uploadJobs, createJob } = require('./state/upload-jobs');
 
 // Core services
-const { CollectionMetadataService } = require('./services/collections-metadata-service');
-const collectionsService = new CollectionMetadataService(qdrantClient);
-
-const { createCollectionMiddleware } = require('./middleware/collection');
-const collectionMiddleware = createCollectionMiddleware(collectionsService);
-
 const { createEmbeddingService } = require('./services/embedding-service');
 const embeddingService = createEmbeddingService({
   axios,
@@ -89,6 +83,14 @@ const embeddingService = createEmbeddingService({
   authToken: AUTH_TOKEN,
   model: EMBEDDING_MODEL
 });
+
+const { CollectionMetadataService } = require('./services/collections-metadata-service');
+const collectionsService = new CollectionMetadataService(qdrantClient, {
+  getDenseVectorSize: async () => embeddingService.fetchEmbeddingDimension()
+});
+
+const { createCollectionMiddleware } = require('./middleware/collection');
+const collectionMiddleware = createCollectionMiddleware(collectionsService);
 
 const { createCategorizationService } = require('./services/categorization-service');
 const categorizationService = createCategorizationService({
@@ -283,6 +285,8 @@ app.use(
 // Start server
 async function startServer() {
   try {
+    await embeddingService.fetchEmbeddingDimension();
+
     await collectionsService.initialize();
     console.log('✅ Collections metadata service initialized');
 

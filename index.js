@@ -18,6 +18,23 @@ if (!EMBEDDING_MODEL) {
 // Initialize Qdrant client
 const qdrantClient = new QdrantClient({ url: QDRANT_URL });
 
+let cachedEmbeddingDimension = null;
+
+async function getEmbeddingDimension() {
+  if (cachedEmbeddingDimension) return cachedEmbeddingDimension;
+
+  const embedding = await getDenseEmbedding('dimension_probe');
+  if (!Array.isArray(embedding) || embedding.length === 0) {
+    console.warn('⚠️  Could not detect embedding dimension from Ollama; defaulting to 768');
+    cachedEmbeddingDimension = 768;
+    return cachedEmbeddingDimension;
+  }
+
+  cachedEmbeddingDimension = embedding.length;
+  console.log(`✓ Detected embedding dimension: ${cachedEmbeddingDimension}`);
+  return cachedEmbeddingDimension;
+}
+
 /**
  * Get dense embedding from Ollama
  */
@@ -175,12 +192,14 @@ async function initializeCollection() {
       return;
     }
     
+    const denseVectorSize = await getEmbeddingDimension();
+
     // Create collection with both dense and sparse vector support
     await qdrantClient.createCollection(COLLECTION_NAME, {
       vectors: {
         // Dense vector for semantic search
         dense: {
-          size: 768, // Adjust based on your embedding model
+          size: denseVectorSize,
           distance: 'Cosine'
         }
       },

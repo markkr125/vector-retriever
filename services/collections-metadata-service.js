@@ -15,10 +15,13 @@ function generateUUID() {
  * Manages collections metadata using a special Qdrant collection
  */
 class CollectionMetadataService {
-  constructor(qdrantClient) {
+  constructor(qdrantClient, options = {}) {
     this.client = qdrantClient;
     this.collectionName = COLLECTIONS_METADATA_NAME;
     this.cache = new Map(); // In-memory cache for faster lookups
+
+    // Optional async provider for dense vector size (embedding dimension)
+    this.getDenseVectorSize = options.getDenseVectorSize || null;
   }
 
   /**
@@ -145,10 +148,18 @@ class CollectionMetadataService {
       const exists = collections.collections.some(c => c.name === qdrantName);
 
       if (!exists) {
+        let denseVectorSize = 768;
+        if (this.getDenseVectorSize) {
+          denseVectorSize = await this.getDenseVectorSize();
+        }
+        if (!Number.isInteger(denseVectorSize) || denseVectorSize <= 0) {
+          throw new Error(`Invalid dense vector size: ${denseVectorSize}`);
+        }
+
         await this.client.createCollection(qdrantName, {
           vectors: {
             dense: {
-              size: 768,
+              size: denseVectorSize,
               distance: 'Cosine'
             }
           },
