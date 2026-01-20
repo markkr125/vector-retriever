@@ -1250,6 +1250,15 @@ app.post('/api/documents/upload', upload.array('files', 100), async (req, res) =
 - Playwright generates artifacts in `playwright-report/` and `test-results/` (and CI uploads them on failure). These directories should be ignored in git.
 - CI retries are controlled in `playwright.config.js` via the `retries` setting. Keep retries low in CI to fail fast when something is genuinely broken.
 
+**E2E determinism (collections):**
+- Qdrant data is persistent across local runs; avoid relying on “default” collection being clean.
+- For tests that upload/search documents, create a dedicated collection via `POST /api/collections`, set `localStorage.activeCollection` via `page.addInitScript(...)` before `page.goto()`, and `POST /api/collections/:id/empty` in `beforeEach`.
+- Clean up with `DELETE /api/collections/:id` in `afterAll`.
+
+**Local runs (Playwright HTML report):**
+- `playwright.config.js` uses `['html', { open: 'never' }]` so `npm run test:e2e` exits normally.
+- To view the last report manually: `npx playwright show-report`.
+
 ### Automated Tests (61 unit tests, all passing)
 **Test Stack:**
 - Backend: Jest 29.7.0 with Supertest 6.3.3

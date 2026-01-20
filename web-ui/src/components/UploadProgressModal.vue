@@ -159,8 +159,14 @@ export default {
     });
 
     const canBack = computed(() => {
-      // Treat "stopped" as "paused" for UX.
-      return jobStatus.value === 'stopped';
+      // "Back" is used to return to the upload modal (kept mounted) so the
+      // user can adjust selection/options after a stopped or erroring upload.
+      // Note: upload jobs currently end in "completed" even if some files failed.
+      return (
+        jobStatus.value === 'stopped' ||
+        jobStatus.value === 'error' ||
+        (jobStatus.value === 'completed' && failedFiles.value > 0)
+      );
     });
 
     const canResume = computed(() => {
@@ -227,6 +233,7 @@ export default {
     function getFileIcon(status) {
       switch (status) {
         case 'success': return '✅';
+        case 'updated': return '🔄';
         case 'error': return '❌';
         case 'processing': return '⏳';
         case 'pending': return '⏱️';

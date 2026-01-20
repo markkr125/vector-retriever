@@ -25,7 +25,9 @@ describe('ResultsList.vue', () => {
         content: 'Luxury hotel',
         price: 450,
         rating: 4.8,
-        filename: 'hotel.txt'
+        filename: 'hotel.txt',
+        added_at: '2020-01-01T00:00:00.000Z',
+        last_updated: '2020-01-01T00:00:00.000Z'
       }
     },
     {
@@ -37,7 +39,9 @@ describe('ResultsList.vue', () => {
         content: 'Italian restaurant',
         price: 50,
         rating: 4.5,
-        filename: 'restaurant.txt'
+        filename: 'restaurant.txt',
+        added_at: '2020-01-02T00:00:00.000Z',
+        last_updated: '2020-01-03T00:00:00.000Z'
       }
     }
   ];
@@ -106,6 +110,29 @@ describe('ResultsList.vue', () => {
     const text = wrapper.text();
     expect(text).toContain('hotel');
     expect(text).toContain('Paris');
+    // Upload timestamp should render
+    expect(text).toContain('Uploaded:');
+    // For the first result (added_at === last_updated), Last updated should not be shown for that card.
+    // The second result has last_updated different, so it should appear somewhere on the page.
+    expect(text).toContain('Last updated:');
+  });
+
+  it('does not show Last updated when last_updated equals added_at for a result', () => {
+    const onlyNew = [mockResults[0]];
+    wrapper = mount(ResultsList, {
+      props: {
+        results: onlyNew,
+        totalResults: 1,
+        currentPage: 1,
+        limit: 20,
+        searchType: 'search',
+        query: 'test'
+      }
+    });
+
+    const text = wrapper.text();
+    expect(text).toContain('Uploaded:');
+    expect(text).not.toContain('Last updated:');
   });
 
   it('shows empty state when no query', () => {

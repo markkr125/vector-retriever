@@ -1,6 +1,6 @@
 const { parseMetadataFromContent } = require('../utils/metadata');
 const { pdfToMarkdownViaHtml, processPdfText } = require('../utils/pdf-utils');
-const { getSparseVector, simpleHash } = require('../utils/text-utils');
+const { getSparseVector, generateDocumentHash } = require('../utils/text-utils');
 const { throwIfAborted } = require('./ollama-agent');
 const { extractCSV, extractXLSX, extractPPTX, extractRTF } = require('../utils/office-extractors');
 
@@ -34,6 +34,10 @@ function createDocumentService({
     };
 
     reportStage('Preparing file…');
+
+    // Extract cloud metadata if provided
+    const cloudMetadata = options.cloudMetadata || {};
+    const { s3Key, driveId } = cloudMetadata;
 
     // Decode base64-encoded filename (used to preserve UTF-8 for Hebrew/Arabic/etc)
     let filename = file.originalname;
@@ -332,10 +336,31 @@ function createDocumentService({
     // Generate sparse vector
     const sparseVector = getSparseVector(content);
 
-    // Create point ID from filename and timestamp
-    const pointId = simpleHash(filename + Date.now());
+    // Generate stable document hash for deduplication
+    const documentHash = generateDocumentHash(filename, s3Key, driveId);
 
-    // Store in Qdrant
+    // Check if document already exists (via existingDocuments map passed in options)
+    const existingDocuments = options.existingDocuments || new Map();
+    const existingDoc = existingDocuments.get(documentHash);
+
+    let pointId = documentHash;
+    const nowIso = new Date().toISOString();
+    let addedAt = nowIso;
+    let isUpdate = false;
+
+    if (existingDoc) {
+      // Document exists - preserve original added_at and use existing ID
+      pointId = existingDoc.id;
+      addedAt = existingDoc.added_at || addedAt;
+      isUpdate = true;
+      console.log(`📝 Updating existing document: ${filename} (ID: ${pointId})`);
+    } else {
+      console.log(`➕ Adding new document: ${filename} (ID: ${pointId})`);
+    }
+
+    const lastUpdated = isUpdate ? nowIso : addedAt;
+
+    // Store in Qdrant (upsert handles both insert and update)
     reportStage('Saving to vector database…');
     await qdrantClient.upsert(collectionName, {
       points: [
@@ -348,13 +373,14 @@ function createDocumentService({
           payload: {
             ...parsedMetadata,
             content: content,
-            added_at: new Date().toISOString()
+            added_at: addedAt,
+            last_updated: lastUpdated
           }
         }
       ]
     });
 
-    console.log(`✅ Successfully uploaded: ${filename}`);
+    console.log(`✅ Successfully ${isUpdate ? 'updated' : 'uploaded'}: ${filename}`);
 
     reportStage('Done');
 
@@ -363,7 +389,8 @@ function createDocumentService({
       id: pointId,
       fileType: fileExt,
       contentLength: content.length,
-      metadata: parsedMetadata
+      metadata: parsedMetadata,
+      isUpdate: isUpdate
     };
   }
 
@@ -417,8 +444,15 @@ function createDocumentService({
     // Generate sparse vector
     const sparseVector = getSparseVector(content);
 
-    // Create point ID from filename
-    const pointId = simpleHash(filename + Date.now());
+    const pointId = generateDocumentHash(filename);
+    const now = new Date().toISOString();
+
+    const existingDocuments = await checkForDuplicates(collectionName, [pointId]);
+    const existingDoc = existingDocuments.get(pointId);
+
+    const addedAt = existingDoc?.payload?.added_at || now;
+    const lastUpdated = existingDoc ? now : addedAt;
+    const isUpdate = !!existingDoc;
 
     // Store in Qdrant
     await qdrantClient.upsert(collectionName, {
@@ -432,15 +466,16 @@ function createDocumentService({
           payload: {
             ...parsedMetadata,
             content: content,
-            added_at: new Date().toISOString()
+            added_at: addedAt,
+            last_updated: lastUpdated
           }
         }
       ]
     });
 
-    console.log(`✅ Successfully added: ${filename}`);
+    console.log(`✅ Successfully ${isUpdate ? 'updated' : 'added'}: ${filename}`);
 
-    return { pointId, parsedMetadata };
+    return { pointId, parsedMetadata, isUpdate };
   }
 
   async function extractContentForSearchByDocument({ fileBuffer, filename }) {
@@ -522,10 +557,54 @@ function createDocumentService({
     return { content, fileExt };
   }
 
+  /**
+   * Batch check for existing documents by their hashes.
+   * Returns a Map of hash -> {id, added_at} for efficient lookup during upload.
+   * 
+   * @param {string} collectionName - Qdrant collection name
+   * @param {number[]} documentHashes - Array of document hashes to check
+   * @returns {Promise<Map<number, {id: number, added_at: string}>>}
+   */
+  async function checkForDuplicates(collectionName, documentHashes) {
+    if (!documentHashes || documentHashes.length === 0) {
+      return new Map();
+    }
+
+    console.log(`🔍 Checking for ${documentHashes.length} potential duplicates...`);
+
+    try {
+      // Query Qdrant by point IDs (fast, single call). Using IDs avoids payload filtering/index needs.
+      const points = await qdrantClient.retrieve(collectionName, {
+        ids: documentHashes,
+        with_payload: true,
+        with_vector: false
+      });
+
+      const existingMap = new Map();
+      if (Array.isArray(points) && points.length > 0) {
+        points.forEach(point => {
+          existingMap.set(point.id, {
+            id: point.id,
+            added_at: point.payload?.added_at
+          });
+        });
+        console.log(`📋 Found ${existingMap.size} existing documents that will be updated`);
+      } else {
+        console.log('✨ No duplicates found - all files are new');
+      }
+
+      return existingMap;
+    } catch (error) {
+      console.error('Error checking for duplicates:', error);
+      return new Map();
+    }
+  }
+
   return {
     processSingleFile,
     addDocument,
     extractContentForSearchByDocument,
+    checkForDuplicates,
     visionService,
     descriptionService
   };

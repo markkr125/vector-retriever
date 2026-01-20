@@ -378,6 +378,20 @@
               {{ tag }}
             </span>
           </div>
+
+          <!-- Upload/Update timestamps -->
+          <div class="timestamp-row">
+            <span v-if="result.payload.added_at" class="timestamp" :title="result.payload.added_at">
+              📅 Uploaded: {{ formatDate(result.payload.added_at) }}
+            </span>
+            <span 
+              v-if="result.payload.last_updated && result.payload.last_updated !== result.payload.added_at" 
+              class="timestamp updated"
+              :title="result.payload.last_updated"
+            >
+              🔄 Last updated: {{ formatDate(result.payload.last_updated) }}
+            </span>
+          </div>
         </div>
 
         <!-- Content Preview -->
@@ -832,6 +846,22 @@ const truncateContent = (content, maxLength) => {
   if (!content) return ''
   if (content.length <= maxLength) return content
   return content.substring(0, maxLength) + '...'
+}
+
+const formatDate = (isoString) => {
+  if (!isoString) return ''
+  try {
+    const date = new Date(isoString)
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch (e) {
+    return isoString
+  }
 }
 
 const renderMarkdown = (content) => {

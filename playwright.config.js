@@ -9,7 +9,9 @@ export default defineConfig({
   // CI retries can hide failures and waste time; keep this low.
   retries: process.env.CI ? 1 : 0,
   workers: 1,
-  reporter: process.env.CI ? [['line'], ['github']] : 'html',
+  reporter: process.env.CI
+    ? [['line'], ['github']]
+    : [['line'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',

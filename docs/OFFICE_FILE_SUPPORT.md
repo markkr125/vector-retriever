@@ -73,6 +73,21 @@ To enable legacy Office and OpenDocument format support, you must:
    LIBREOFFICE_MAX_CONCURRENCY=2
    ```
 
+  The project’s `.env` settings are intentionally explicit (with safe defaults):
+
+  ```env
+  # LibreOffice Conversion (optional - for legacy Office and OpenDocument formats)
+  LIBREOFFICE_ENABLED=false  # Set to 'true' to enable support for .doc, .ppt, .xls, .odt, .odp, .ods files
+  LIBREOFFICE_PATH=  # Optional: path to LibreOffice soffice binary (auto-detected if not set)
+  LIBREOFFICE_TIMEOUT_MS=60000  # Conversion timeout in milliseconds (default: 60000 = 60 seconds)
+  LIBREOFFICE_MAX_CONCURRENCY=2  # Maximum concurrent LibreOffice conversions (default: 2)
+  ```
+
+  Implementation lives in `services/libreoffice-converter.js` and is designed to be safe-by-default:
+  - When `LIBREOFFICE_ENABLED=false`, legacy/ODF uploads return a clear error explaining how to enable support.
+  - `LIBREOFFICE_TIMEOUT_MS` prevents runaway conversions.
+  - `LIBREOFFICE_MAX_CONCURRENCY` limits CPU/RAM spikes when multiple uploads arrive.
+
 ### Environment Variables
 
 | Variable | Default | Description |

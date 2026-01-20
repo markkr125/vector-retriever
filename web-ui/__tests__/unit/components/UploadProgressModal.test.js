@@ -40,7 +40,7 @@ describe('UploadProgressModal.vue', () => {
       limit: 5,
       files: [
         { name: 'file1.txt', status: 'success' },
-        { name: 'file2.txt', status: 'success' },
+        { name: 'file2.txt', status: 'updated' },
         { name: 'file3.txt', status: 'processing' },
         { name: 'file4.txt', status: 'pending' },
         { name: 'file5.txt', status: 'pending' }
@@ -142,6 +142,7 @@ describe('UploadProgressModal.vue', () => {
     
     const text = wrapper.text();
     expect(text).toContain('✅'); // success icon
+    expect(text).toContain('🔄'); // updated icon
     expect(text).toContain('⏳'); // processing icon
     expect(text).toContain('⏱️'); // pending icon
   });
@@ -218,11 +219,51 @@ describe('UploadProgressModal.vue', () => {
     expect(wrapper.find('.btn-warning').exists()).toBe(false);
   });
 
+  it('shows back button when completed with errors', async () => {
+    api.getUploadJobStatus.mockResolvedValue({
+      ...mockJobData,
+      status: 'completed',
+      processedFiles: 5,
+      failedFiles: 1
+    });
+
+    wrapper = mount(UploadProgressModal, {
+      props: { show: true, jobId: 'job_123' }
+    });
+
+    await vi.advanceTimersByTimeAsync(50);
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).toContain('Back');
+    expect(wrapper.text()).not.toContain('Resume Upload');
+  });
+
   it('emits back event when back clicked', async () => {
     api.getUploadJobStatus.mockResolvedValue({
       ...mockJobData,
       status: 'stopped',
       source: 'cloud'
+    });
+
+    wrapper = mount(UploadProgressModal, {
+      props: { show: true, jobId: 'job_123' }
+    });
+
+    await vi.advanceTimersByTimeAsync(50);
+    await wrapper.vm.$nextTick();
+
+    const backBtn = wrapper.findAll('button').find(b => b.text() === 'Back');
+    expect(backBtn).toBeTruthy();
+    await backBtn.trigger('click');
+    expect(wrapper.emitted('back')).toBeTruthy();
+  });
+
+  it('emits back event when back clicked after completion with errors', async () => {
+    api.getUploadJobStatus.mockResolvedValue({
+      ...mockJobData,
+      status: 'completed',
+      processedFiles: 5,
+      failedFiles: 1
     });
 
     wrapper = mount(UploadProgressModal, {

@@ -276,10 +276,12 @@ describe('cloud-import routes (unit)', () => {
 
     const processSingleFile = jest.fn(async (_file, _collection, _autoCategorize, options) => {
       options?.onStage?.('Embedding…');
-      return { id: 'doc_1' };
+      return { id: 'doc_1', isUpdate: false };
     });
 
-    const app = createApp({ documentService: { processSingleFile } });
+    const checkForDuplicates = jest.fn(async () => new Map());
+
+    const app = createApp({ documentService: { processSingleFile, checkForDuplicates } });
 
     const res = await request(app)
       .post('/api/cloud-import/import')
@@ -301,6 +303,7 @@ describe('cloud-import routes (unit)', () => {
     expect(job.successfulFiles).toBe(1);
     expect(job.failedFiles).toBe(0);
     expect(processSingleFile).toHaveBeenCalledTimes(1);
+    expect(checkForDuplicates).toHaveBeenCalledTimes(1);
   });
 
   test('POST /api/cloud-import/analyze works for Google Drive using mocked analysis (no Google API calls)', async () => {
@@ -364,10 +367,12 @@ describe('cloud-import routes (unit)', () => {
 
     const processSingleFile = jest.fn(async (_file, _collection, _autoCategorize, options) => {
       options?.onStage?.('Embedding…');
-      return { id: 'doc_g1' };
+      return { id: 'doc_g1', isUpdate: false };
     });
 
-    const app = createApp({ documentService: { processSingleFile } });
+    const checkForDuplicates = jest.fn(async () => new Map());
+
+    const app = createApp({ documentService: { processSingleFile, checkForDuplicates } });
 
     const res = await request(app)
       .post('/api/cloud-import/import')
@@ -389,5 +394,6 @@ describe('cloud-import routes (unit)', () => {
     expect(job.successfulFiles).toBe(1);
     expect(job.failedFiles).toBe(0);
     expect(processSingleFile).toHaveBeenCalledTimes(1);
+    expect(checkForDuplicates).toHaveBeenCalledTimes(1);
   });
 });

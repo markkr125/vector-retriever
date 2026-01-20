@@ -738,8 +738,21 @@ const handleFileSelect = (event) => {
   errorMessage.value = ''
 }
 
+const resetSelectedFiles = () => {
+  selectedFiles.value = []
+  if (fileInput.value) {
+    // Resetting the input value allows re-selecting the same file
+    // and prevents stale UI state when the modal is kept mounted.
+    fileInput.value.value = ''
+  }
+}
+
 const removeFile = (index) => {
   selectedFiles.value.splice(index, 1)
+
+  if (selectedFiles.value.length === 0) {
+    resetSelectedFiles()
+  }
 }
 
 const close = () => {
@@ -803,6 +816,9 @@ const handleSubmit = async () => {
           'Content-Type': 'multipart/form-data'
         }
       })
+
+      // Clear selection so reopening the modal doesn't show stale files.
+      resetSelectedFiles()
 
       // Emit job started event with job ID
       emit('job-started', response.data.jobId)

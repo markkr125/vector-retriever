@@ -284,8 +284,35 @@ async function embedFiles() {
     const metadata = parseMetadata(file, content);
     metadata.content = content;
     
-    // Generate unique ID
+    // Generate stable ID for deduplication (matches web upload behavior)
     const pointId = simpleHash(file);
+    
+    // Check if document already exists
+    let addedAt = new Date().toISOString();
+    let documentExists = false;
+    try {
+      const existingPoints = await qdrantClient.retrieve(COLLECTION_NAME, {
+        ids: [pointId],
+        with_payload: true
+      });
+      
+      if (existingPoints && existingPoints.length > 0) {
+        // Document exists - preserve original added_at
+        addedAt = existingPoints[0].payload?.added_at || addedAt;
+        documentExists = true;
+        console.log(`📝 Updating existing document: ${file}`);
+      } else {
+        console.log(`➕ Adding new document: ${file}`);
+      }
+    } catch (e) {
+      // Document doesn't exist or error checking - treat as new
+      console.log(`➕ Adding new document: ${file}`);
+    }
+    
+    // Add timestamps
+    const nowIso = new Date().toISOString();
+    metadata.added_at = addedAt;
+    metadata.last_updated = documentExists ? nowIso : addedAt;
     
     // Upsert point with both dense and sparse vectors
     try {

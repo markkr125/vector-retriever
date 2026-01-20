@@ -1,4 +1,4 @@
-# Multi-Format File Upload - Implementation Summary
+# File Upload System - Implementation Summary
 
 ## Table of Contents
 - [Overview](#overview)
@@ -17,7 +17,12 @@
 - [Conclusion](#conclusion)
 
 ## Overview
-Enhanced the Ollama-Qdrant web UI with multi-format document upload capabilities, supporting TXT, JSON, PDF, DOCX, and DOC files.
+This project supports **multi-file uploads** with an **async background job** (pollable progress), plus optional cloud import.
+
+Key behaviors:
+- Supports multiple formats (TXT/JSON/PDF/DOCX/CSV/XLSX/PPTX/RTF, and optional legacy/ODF via LibreOffice).
+- Uploads run as background jobs and stream progress to the UI via polling.
+- Re-uploading the “same file” **updates** the existing document (per-collection deduplication) and preserves the original `added_at` while updating `last_updated`.
 
 ## Backend Changes
 
@@ -30,38 +35,40 @@ Enhanced the Ollama-Qdrant web UI with multi-format document upload capabilities
 }
 ```
 
-### New Endpoint: `/api/documents/upload`
+### Upload Endpoint: `/api/documents/upload`
 - **Method**: POST
 - **Content-Type**: multipart/form-data
 - **Max File Size**: 10MB
-- **Supported Formats**: txt, json, pdf, docx, doc
+- **Supported Formats**:
+  - Modern (pure JS): `.txt`, `.json`, `.pdf`, `.docx`, `.csv`, `.xlsx`, `.pptx`, `.rtf`
+  - Optional (LibreOffice conversion): `.doc`, `.ppt`, `.xls`, `.odt`, `.odp`, `.ods`
 
-#### File Processing Logic
+For a complete format breakdown and LibreOffice setup, see [Office File Support](OFFICE_FILE_SUPPORT.md).
 
-**TXT Files**
-- Direct UTF-8 text extraction
-- No special processing required
+#### File Processing Logic (High-level)
 
-**JSON Files**
-- Parses JSON structure
-- Extracts `content` field if present
-- Automatically merges embedded metadata
-- Falls back to stringified JSON if no content field
+**TXT / Markdown / HTML**
+- Direct text extraction (with light normalization)
 
-**PDF Files**
-- Extracts all text content using pdf-parse
-- Captures page count as metadata
-- Handles multi-page documents
+**JSON**
+- Parses JSON
+- Extracts `content` field when present
+- Merges embedded metadata when present
+- Falls back to a stringified representation if needed
 
-**DOCX Files**
-- Extracts raw text using mammoth
-- Preserves document structure
-- High reliability
+**PDF**
+- Uses a PDF parsing fallback chain (HTML-based extraction, markdown conversion, then text extraction)
+- Guards against embedding model context overflows
 
-**DOC Files**
-- Attempts parsing with mammoth
-- Best-effort conversion (legacy format)
-- Returns error if parsing fails with suggestion to convert to DOCX
+**DOCX**
+- Extracted via `mammoth` (preserves headings/lists reasonably well)
+
+**CSV / XLSX / PPTX / RTF**
+- Extracted with format-specific parsers
+- Applies token-limit aware truncation (e.g., stop at row/slide boundaries)
+
+**Legacy Office / OpenDocument (LibreOffice-enabled)**
+- Files are converted first (e.g., `.doc` → `.docx`, `.ppt` → `.pdf`, `.xls` → `.csv`) then processed by the existing extractors.
 
 #### Metadata Handling
 1. Automatic extraction from file content using `parseMetadataFromContent()`
@@ -69,25 +76,38 @@ Enhanced the Ollama-Qdrant web UI with multi-format document upload capabilities
 3. Manual override via form data (`req.body.metadata`)
 4. Merged with priority: manual > file-embedded > extracted
 
+#### Deduplication and Update Semantics
+
+Uploads are deduplicated **per collection** by using a stable document ID:
+- Local uploads: stable hash from filename
+- Cloud imports: prefer stable provider identifiers (S3 object key, Google Drive file ID)
+
+Behavior:
+- If the ID already exists: the document is **updated** (Qdrant `upsert`) and `added_at` is preserved.
+- If it’s new: `added_at` is set and `last_updated === added_at`.
+- If updated: `last_updated` is set to “now”.
+
+The Web UI renders both timestamps when available.
+
 ## Frontend Changes
 
 ### UploadModal.vue Updates
 
-#### New Features
+#### Key Features
 1. **Upload Method Toggle**
    - "Text Input" mode (original functionality)
    - "File Upload" mode (new)
 
 2. **File Input Component**
-   - Accepts: .txt, .json, .pdf, .doc, .docx
+- Accepts: derived from `GET /api/config` (includes Office formats; legacy formats appear only when LibreOffice is enabled)
    - Max size: 10MB
    - Shows selected filename
    - File format validation
 
 3. **Dual Submission Logic**
-   - Text mode: POSTs to `/api/documents/add`
-   - File mode: POSTs to `/api/documents/upload` with FormData
-   - Metadata serialized as JSON string for file uploads
+- Text mode: POSTs to `/api/documents/add`
+- File mode: POSTs to `/api/documents/upload` with FormData (multi-file)
+- Upload progress is tracked via upload jobs (`/api/upload-jobs/:jobId`)
 
 #### Code Structure
 ```javascript
@@ -115,14 +135,17 @@ const handleSubmit = async () => {
 }
 ```
 
-## Documentation Updates
+## Upload Jobs & Progress Tracking
 
-### web-ui/README.md
-- Added "Document Upload" section
-- Listed all supported file formats with descriptions
-- Documented both upload methods (text input vs file upload)
-- Explained automatic metadata extraction
-- Added manual metadata override instructions
+Uploads are processed asynchronously and tracked via an upload job object.
+
+Key endpoints:
+- `GET /api/upload-jobs/active` (must be defined before `/:jobId`)
+- `GET /api/upload-jobs/:jobId?filesLimit=0` (light polling)
+- `GET /api/upload-jobs/:jobId/files?offset=0&limit=200` (paged file list for large jobs)
+
+File-level statuses include:
+- `pending`, `processing`, `success`, `updated`, `error`
 
 ## Testing
 
@@ -210,10 +233,9 @@ Content-Disposition: form-data; name="metadata"
 
 ## Future Enhancements
 
-1. **Progress Indicators**: Show upload/embedding progress
-2. **Batch Upload**: Support multiple files at once
+1. **Batch Upload**: Improve batching for very large queues
 3. **Preview**: Show extracted content before submission
-4. **More Formats**: CSV, XML, HTML, Markdown
+4. **More Formats**: XML or additional structured extractors
 5. **OCR Support**: Image-based PDFs with text recognition
 6. **Compression**: Support for ZIP archives
 7. **Cloud Storage**: Direct upload from Google Drive, Dropbox

@@ -132,6 +132,17 @@ Welcome to the Vector Retriever documentation! This folder contains comprehensiv
 
 ---
 
+### [File Upload System](FILE_UPLOAD_IMPLEMENTATION.md)
+**Async upload jobs, multi-file processing, and deduplication semantics**
+- Upload jobs and progress polling endpoints
+- File-by-file status reporting (including `updated`)
+- Per-collection deduplication and `added_at` / `last_updated`
+- Supported formats (including optional LibreOffice conversions)
+
+**Best for:** Understanding how uploads are processed end-to-end (UI → API → Qdrant).
+
+---
+
 ### [Collection Rename Feature](COLLECTION_RENAME.md)
 **Inline collection renaming with validation**
 - Backend API and service implementation
