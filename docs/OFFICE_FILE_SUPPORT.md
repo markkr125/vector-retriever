@@ -313,4 +313,3 @@ Potential improvements:
 - [ ] Custom truncation strategies (e.g., "first N + last M rows")
 - [ ] Image extraction from PPTX/DOCX
 - [ ] Formula evaluation in XLSX
-- [ ] Native `.doc` parsing (without LibreOffice)
