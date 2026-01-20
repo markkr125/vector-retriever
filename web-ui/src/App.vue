@@ -1407,8 +1407,8 @@ const handleProgressModalClose = async () => {
 
 const handleProgressModalBack = () => {
   showProgressModal.value = false
-  // "Back" is only available when the job is stopped; treat it as a terminal
-  // state for the header button.
+  // "Back" is available for stopped uploads and completed uploads with errors;
+  // treat it as a terminal state for the header button.
   activeJobId.value = null
   localStorage.removeItem('activeUploadJobId')
   // Re-open the UploadModal (kept mounted via v-show) so the user returns to the
