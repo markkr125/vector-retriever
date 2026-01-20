@@ -36,6 +36,26 @@ async function processCloudImport(options) {
   job.status = 'processing';
 
   try {
+    // Batch check for duplicates before processing
+    const { generateDocumentHash } = require('../utils/text-utils');
+    
+    // Calculate hashes for all queued files
+    const fileHashes = job.cloudImportQueue.map(fileInfo => {
+      if (job.provider === 's3') {
+        // Use S3 key for stable identification
+        return generateDocumentHash(fileInfo.name, fileInfo.key || fileInfo.name);
+      } else if (job.provider === 'gdrive') {
+        // Use Google Drive ID if available
+        return generateDocumentHash(fileInfo.name, null, fileInfo.id || fileInfo.driveId);
+      }
+      return generateDocumentHash(fileInfo.name);
+    });
+
+    const existingDocuments = await documentService.checkForDuplicates(
+      job.qdrantCollection,
+      fileHashes
+    );
+
     while (job.cloudImportCursor < job.cloudImportQueue.length) {
       if (job.status === 'stopped') {
         console.log(`Job ${jobId} was stopped, skipping remaining files`);
@@ -98,19 +118,29 @@ async function processCloudImport(options) {
           size: fileInfo.size
         };
 
+        // Prepare cloud metadata for stable hash generation
+        const cloudMetadata = {};
+        if (job.provider === 's3') {
+          cloudMetadata.s3Key = fileInfo.key || fileInfo.name;
+        } else if (job.provider === 'gdrive') {
+          cloudMetadata.driveId = fileInfo.id || fileInfo.driveId;
+        }
+
         const result = await documentService.processSingleFile(
           file,
           job.qdrantCollection,
           !!job.cloudImportAutoCategorize,
           {
             signal: job.abortController?.signal,
+            cloudMetadata: cloudMetadata,
+            existingDocuments: existingDocuments,
             onStage: (stage) => {
               job.currentStage = stage;
             }
           }
         );
 
-        job.files[index].status = 'success';
+        job.files[index].status = result.isUpdate ? 'updated' : 'success';
         job.files[index].id = result.id;
         job.successfulFiles++;
       } catch (error) {

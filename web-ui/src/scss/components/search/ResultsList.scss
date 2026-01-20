@@ -628,6 +628,28 @@
   color: var(--text-secondary);
 }
 
+/* Timestamp Row */
+.timestamp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+}
+
+.timestamp {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.timestamp.updated {
+  color: var(--color-info);
+  font-weight: 500;
+}
+
 /* PII Inline Section */
 .pii-inline-section {
   display: flex;

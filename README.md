@@ -35,6 +35,8 @@ General purpose vector database application showcasing **Qdrant's powerful featu
 - **[Location Search Examples](docs/LOCATION_SEARCH_EXAMPLES.md)** - City and geo-radius queries
 - **[Advanced Queries](docs/ADVANCED_QUERIES.md)** - Complex filtering patterns
 - **[Document Cluster Visualization](docs/VISUALIZATION.md)** - Interactive 2D visualization guide
+- **[File Upload System](docs/FILE_UPLOAD_IMPLEMENTATION.md)** - Upload jobs, multi-file processing, and supported formats
+- **[Office File Support](docs/OFFICE_FILE_SUPPORT.md)** - CSV/XLSX/PPTX/RTF + optional LibreOffice conversion for legacy Office/ODF
 
 ## 🌟 Key Features Demonstrated
 
@@ -76,6 +78,11 @@ Each document includes structured metadata:
 - **Seamless coexistence**: Both types searchable with semantic/hybrid search
 - **Flexible filtering**: Filter by document type (`is_unstructured`, `has_structured_metadata`)
 - **Real-world scenario**: Handles heterogeneous document collections naturally
+
+### 6. **Upload Deduplication (Per Collection)**
+- Re-uploading the same file automatically **updates** the existing document (no prompt)
+- Uses stable IDs (cloud imports prefer provider IDs/keys; local uploads fall back to filename)
+- Preserves original `added_at` and sets `last_updated` on updates (shown in the Web UI)
 
 ## 📋 Prerequisites
 
@@ -415,6 +422,20 @@ cp .env.example .env
 |----------|---------|-------------|
 | `SERVER_PORT` | `3001` | Port for the Express API server |
 | `MAX_FILE_SIZE_MB` | `10` | Maximum upload file size in megabytes |
+
+#### LibreOffice Conversion (Optional - Legacy Office / OpenDocument)
+
+Some legacy formats (Word 97-2003, PowerPoint 97-2003, Excel 97-2003, and OpenDocument) require LibreOffice for conversion.
+
+```env
+# LibreOffice Conversion (optional - for legacy Office and OpenDocument formats)
+LIBREOFFICE_ENABLED=false  # Set to 'true' to enable support for .doc, .ppt, .xls, .odt, .odp, .ods files
+LIBREOFFICE_PATH=  # Optional: path to LibreOffice soffice binary (auto-detected if not set)
+LIBREOFFICE_TIMEOUT_MS=60000  # Conversion timeout in milliseconds (default: 60000 = 60 seconds)
+LIBREOFFICE_MAX_CONCURRENCY=2  # Maximum concurrent LibreOffice conversions (default: 2)
+```
+
+See [Office File Support](docs/OFFICE_FILE_SUPPORT.md) for supported formats, conversion behavior, and troubleshooting.
 
 #### PII Detection (Optional)
 

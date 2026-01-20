@@ -40,7 +40,7 @@ describe('UploadProgressModal.vue', () => {
       limit: 5,
       files: [
         { name: 'file1.txt', status: 'success' },
-        { name: 'file2.txt', status: 'success' },
+        { name: 'file2.txt', status: 'updated' },
         { name: 'file3.txt', status: 'processing' },
         { name: 'file4.txt', status: 'pending' },
         { name: 'file5.txt', status: 'pending' }
@@ -142,6 +142,7 @@ describe('UploadProgressModal.vue', () => {
     
     const text = wrapper.text();
     expect(text).toContain('✅'); // success icon
+    expect(text).toContain('🔄'); // updated icon
     expect(text).toContain('⏳'); // processing icon
     expect(text).toContain('⏱️'); // pending icon
   });

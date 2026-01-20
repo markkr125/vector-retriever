@@ -191,6 +191,11 @@
   background: $bg-success-soft;
 }
 
+.file-item.updated {
+  border-left-color: $color-primary;
+  background: $bg-info-soft;
+}
+
 .file-item.error {
   border-left-color: var(--error, #ef4444);
   background: $bg-error-soft;

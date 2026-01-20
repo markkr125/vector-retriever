@@ -115,6 +115,14 @@ function createUploadsRoutes({
 
       // Process files asynchronously
       (async () => {
+        // Batch check for duplicates before processing
+        const { generateDocumentHash } = require('../utils/text-utils');
+        const fileHashes = files.map(f => generateDocumentHash(f.originalname));
+        const existingDocuments = await documentService.checkForDuplicates(
+          req.qdrantCollection,
+          fileHashes
+        );
+
         for (let i = 0; i < files.length; i++) {
           // Check if job was stopped
           if (job.status === 'stopped') {
@@ -135,13 +143,14 @@ function createUploadsRoutes({
               autoCategorize,
               {
                 signal: job.abortController?.signal,
+                existingDocuments: existingDocuments,
                 onStage: (stage) => {
                   job.currentStage = stage;
                 }
               }
             );
 
-            fileInfo.status = 'success';
+            fileInfo.status = result.isUpdate ? 'updated' : 'success';
             fileInfo.id = result.id;
             job.successfulFiles++;
           } catch (error) {

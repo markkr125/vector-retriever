@@ -37,9 +37,10 @@ function createApp({ documentService, collectionsService, collectionMiddleware }
       documentService:
         documentService ||
         {
+          checkForDuplicates: jest.fn(async () => new Map()),
           processSingleFile: jest.fn(async (_file, _collection, _autoCategorize, options) => {
             options?.onStage?.('Embedding…');
-            return { id: 1 };
+            return { id: 1, isUpdate: false };
           })
         },
       collectionsService:
@@ -77,13 +78,14 @@ describe('uploads routes (unit)', () => {
   });
 
   test('POST /api/documents/upload creates a job and processes files asynchronously (no external calls)', async () => {
+    const checkForDuplicates = jest.fn(async () => new Map());
     const processSingleFile = jest.fn(async (_file, _collection, _autoCategorize, options) => {
       options?.onStage?.('Embedding…');
-      return { id: 123 };
+      return { id: 123, isUpdate: false };
     });
 
     const app = createApp({
-      documentService: { processSingleFile },
+      documentService: { processSingleFile, checkForDuplicates },
       collectionsService: { refreshDocumentCount: jest.fn(async () => {}) }
     });
 
@@ -110,7 +112,35 @@ describe('uploads routes (unit)', () => {
     expect(finalJob.processedFiles).toBe(1);
 
     expect(processSingleFile).toHaveBeenCalledTimes(1);
+    expect(checkForDuplicates).toHaveBeenCalledTimes(1);
     expect(finalJob.currentStage).toBe(null);
+  });
+
+  test('POST /api/documents/upload marks a file as updated when processSingleFile returns isUpdate=true', async () => {
+    const checkForDuplicates = jest.fn(async () => new Map([[123, { id: 123, added_at: '2020-01-01T00:00:00.000Z' }]]));
+    const processSingleFile = jest.fn(async (_file, _collection, _autoCategorize, options) => {
+      options?.onStage?.('Saving…');
+      // Simulate a dedupe update
+      return { id: 123, isUpdate: true };
+    });
+
+    const app = createApp({
+      documentService: { processSingleFile, checkForDuplicates },
+      collectionsService: { refreshDocumentCount: jest.fn(async () => {}) }
+    });
+
+    const res = await request(app)
+      .post('/api/documents/upload')
+      .field('auto_categorize', 'false')
+      .attach('files', Buffer.from('hello'), 'test.txt')
+      .expect(200);
+
+    await waitFor(() => uploadJobs.get(res.body.jobId)?.status === 'completed');
+
+    const finalJob = uploadJobs.get(res.body.jobId);
+    expect(finalJob.files[0].status).toBe('updated');
+    expect(processSingleFile).toHaveBeenCalledTimes(1);
+    expect(checkForDuplicates).toHaveBeenCalledTimes(1);
   });
 
   test('GET /api/upload-jobs/:jobId supports filesLimit=0 (light polling)', async () => {

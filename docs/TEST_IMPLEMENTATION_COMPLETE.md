@@ -216,9 +216,18 @@ module.exports = app;
 ```
 
 ### Test Data Isolation
-- Integration tests create isolated test collections
-- E2E tests use the full application with actual data
 - Unit tests use mocks and don't touch external services
+- Integration tests create isolated test collections (when enabled)
+- E2E tests should not rely on persistent Qdrant state:
+  - Create a dedicated collection for the suite
+  - Set `localStorage.activeCollection` via `page.addInitScript(...)` before `page.goto()`
+  - Empty the collection in `beforeEach`
+  - Delete the collection in `afterAll`
+
+### Local E2E Runs
+
+- Playwright HTML report is generated but not auto-opened (so `npm run test:e2e` exits normally).
+- View the latest report with: `npx playwright show-report`
 
 ## What You Can Do Now
 

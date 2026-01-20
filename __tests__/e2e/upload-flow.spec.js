@@ -2,6 +2,22 @@ import { expect, test } from '@playwright/test';
 import path from 'path';
 
 test.describe('Upload Flow E2E', () => {
+  let uploadFlowCollectionId;
+
+  test.beforeAll(async ({ request }) => {
+    const displayName = `E2E Upload Flow ${Date.now()}`;
+    const res = await request.post('http://localhost:3001/api/collections', {
+      data: { displayName, description: 'E2E collection for upload-flow.spec.js' }
+    });
+    const created = await res.json();
+    uploadFlowCollectionId = created.collectionId;
+  });
+
+  test.afterAll(async ({ request }) => {
+    if (!uploadFlowCollectionId) return;
+    await request.delete(`http://localhost:3001/api/collections/${uploadFlowCollectionId}`).catch(() => {});
+  });
+
   test.beforeEach(async ({ page, request }) => {
     // Ensure prior runs don't leave the app in "Uploading..." state.
     try {
@@ -14,14 +30,24 @@ test.describe('Upload Flow E2E', () => {
       // Ignore if server isn't ready yet; webServer should start it.
     }
 
+    // Clear the dedicated E2E collection between tests.
+    if (uploadFlowCollectionId) {
+      await request
+        .post(`http://localhost:3001/api/collections/${uploadFlowCollectionId}/empty`)
+        .catch(() => {});
+    }
+
     // Clear persisted client state before app code runs.
-    await page.addInitScript(() => {
+    await page.addInitScript((collectionId) => {
       try {
         localStorage.removeItem('activeUploadJobId');
+        if (collectionId) {
+          localStorage.setItem('activeCollection', collectionId);
+        }
       } catch {
         // ignore
       }
-    });
+    }, uploadFlowCollectionId);
 
     await page.goto('/');
     // Wait for app shell to be ready (avoid networkidle with Vite dev/HMR)
@@ -102,6 +128,49 @@ test.describe('Upload Flow E2E', () => {
     await expect(page.locator('.modal-overlay')).toContainText(/success|completed/i, {
       timeout: 30000
     });
+  });
+
+  test('uploading the same file twice updates (no duplicate) and shows Last updated', async ({ page }) => {
+    const uploadBtn = page.locator('button').filter({ hasText: 'Add Document' }).first();
+    const testFilePath = path.join(__dirname, '../fixtures/documents/test_hotel.txt');
+
+    // First upload
+    await uploadBtn.click();
+    await expect(page.locator('.upload-modal-overlay')).toBeVisible({ timeout: 5000 });
+    await page.locator('input[type="file"]').setInputFiles(testFilePath);
+    await page.locator('button[type="submit"]').first().click();
+    await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.modal-overlay')).toContainText(/success|completed/i, { timeout: 30000 });
+    await page.locator('.modal-overlay button').filter({ hasText: 'Close' }).click();
+
+    // Browse and confirm single card + no Last updated on initial insert
+    const browseBtn = page.locator('button').filter({ hasText: 'Browse' });
+    await browseBtn.click();
+    await page.waitForTimeout(1500);
+
+    const filename = 'test_hotel.txt';
+    const cards = page.locator('h3.result-filename', { hasText: filename });
+    await expect(cards).toHaveCount(1);
+
+    const card = cards.first().locator('..').locator('..');
+    await expect(card).toContainText('Uploaded:');
+    await expect(card).not.toContainText('Last updated:');
+
+    // Second upload (same file)
+    await uploadBtn.click();
+    await expect(page.locator('.upload-modal-overlay')).toBeVisible({ timeout: 5000 });
+    await page.locator('input[type="file"]').setInputFiles(testFilePath);
+    await page.locator('button[type="submit"]').first().click();
+    await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.modal-overlay')).toContainText(/updated|success|completed/i, { timeout: 30000 });
+    await page.locator('.modal-overlay button').filter({ hasText: 'Close' }).click();
+
+    // Back to browse: still only one card, now has Last updated
+    await browseBtn.click();
+    await page.waitForTimeout(1500);
+    await expect(page.locator('h3.result-filename', { hasText: filename })).toHaveCount(1);
+    const updatedCard = page.locator('h3.result-filename', { hasText: filename }).first().locator('..').locator('..');
+    await expect(updatedCard).toContainText('Last updated:');
   });
 
   test('stop upload in progress', async ({ page }) => {

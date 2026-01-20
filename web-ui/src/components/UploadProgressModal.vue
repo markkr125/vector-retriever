@@ -227,6 +227,7 @@ export default {
     function getFileIcon(status) {
       switch (status) {
         case 'success': return '✅';
+        case 'updated': return '🔄';
         case 'error': return '❌';
         case 'processing': return '⏳';
         case 'pending': return '⏱️';
