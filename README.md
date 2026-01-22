@@ -11,6 +11,7 @@ General purpose vector database application showcasing **Qdrant's powerful featu
 - [Key Features Demonstrated](#-key-features-demonstrated)
 - [Prerequisites](#-prerequisites)
 - [Quick Start](#-quick-start)
+- [Docker Deployment](#-docker-deployment)
 - [Web UI](#-web-ui)
 - [Basic Usage](#-basic-usage)
 - [Usage Examples](#-usage-examples)
@@ -205,6 +206,52 @@ npm run demo
 ```bash
 node examples/examples.js
 ```
+
+## 🐳 Docker Deployment
+
+Deploy the entire stack with Docker Compose for production use.
+
+### Prerequisites
+
+- Docker with Docker Compose v2
+- NVIDIA Container Toolkit (for GPU support with Ollama)
+
+### Quick Start
+
+```bash
+# Configure your models in .env
+cp .env.example .env
+# Edit .env to set EMBEDDING_MODEL and other model settings
+
+# Start full stack (Qdrant + Ollama + API + Web UI)
+docker compose -f docker/docker-compose.yml up -d
+
+# View logs
+docker compose -f docker/docker-compose.yml logs -f
+```
+
+Access:
+- **Web UI**: http://localhost
+- **API**: http://localhost:3001
+- **Qdrant Dashboard**: http://localhost:6333/dashboard
+
+### GPU Support
+
+The Ollama container automatically uses NVIDIA GPUs if available. For AMD/Intel GPUs, enable Vulkan:
+
+```env
+# In .env file
+OLLAMA_VULKAN=1
+```
+
+### Model Management
+
+The Ollama container automatically:
+- Pulls all models specified in env vars on startup
+- Removes unused models not referenced in env vars
+- Persists models in a Docker volume
+
+See [docker/README.md](docker/README.md) for detailed Docker documentation.
 
 ## 🌐 Web UI
 

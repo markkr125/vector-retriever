@@ -14,6 +14,7 @@
 - [File Upload Processing](#file-upload-processing)
 - [Testing Infrastructure](#testing-infrastructure)
 - [Key Configuration (.env)](#key-configuration-env)
+- [Docker Deployment](#docker-deployment)
 - [When Modifying Code](#when-modifying-code)
 - [Documentation Locations](#documentation-locations)
 
@@ -30,6 +31,22 @@ Vue.js Web UI (port 5173) ←→ Express API (port 3001) ←→ Qdrant DB (port 
                           - default (cannot delete)
                           - user collections (UUID-based)
                           - metadata in _system_collections
+```
+
+### Docker Directory Structure
+```
+docker/
+├── docker-compose.yml           # Full stack (Qdrant + Ollama + API + WebUI)
+├── docker-compose.ollama.yml    # Ollama standalone with GPU support
+├── docker-compose.qdrant.yml    # Qdrant standalone
+├── ollama/
+│   ├── Dockerfile               # Ollama with model management
+│   └── startup.sh               # Auto-pull/cleanup models based on env vars
+├── api/
+│   └── Dockerfile               # Express API server + headless LibreOffice
+└── webui/
+    ├── Dockerfile               # Vue.js production build + nginx
+    └── nginx.conf               # Nginx configuration with API proxy
 ```
 
 **Key Files:**
@@ -56,7 +73,7 @@ Vue.js Web UI (port 5173) ←→ Express API (port 3001) ←→ Qdrant DB (port 
 
 ## Critical Developer Workflows
 
-### Initial Setup
+### Initial Setup (Local Development)
 ```bash
 # 1. Start Qdrant (MUST run first)
 docker-compose -f qdrant-docker-compose.yml up -d
@@ -71,6 +88,21 @@ npm run embed  # Creates 'documents' collection with hybrid vectors
 
 # 4. Start web UI (runs both Vite dev server + Express API)
 npm run webui  # Opens http://localhost:5173 (auto-starts server on 3001)
+```
+
+### Initial Setup (Docker Deployment)
+```bash
+# 1. Configure environment
+cp .env.example .env
+# Edit .env: Set EMBEDDING_MODEL and any optional models
+
+# 2. Start full stack with Docker Compose
+docker compose -f docker/docker-compose.yml up -d
+
+# 3. Access the application
+# Web UI: http://localhost
+# API: http://localhost:3001
+# Qdrant Dashboard: http://localhost:6333/dashboard
 ```
 
 ### Dataset Structure (27 documents)
@@ -1376,6 +1408,52 @@ E2E tests should not depend on downloading Ollama models or running real inferen
 - Workflow: `.github/workflows/test.yml` starts the mock server in the `e2e-tests` job and sets `OLLAMA_URL=http://127.0.0.1:11434/api/embed` + `EMBEDDING_MODEL=mock-embed`.
 - Default CI setting: `PII_DETECTION_ENABLED=false` for E2E to keep runs deterministic and fast.
 
+## Docker Deployment
+
+### Full Stack Deployment
+```bash
+# From project root
+docker compose -f docker/docker-compose.yml up -d
+```
+
+**Services:**
+- `qdrant` - Vector database (ports 6333/6334)
+- `ollama` - LLM server with GPU support (port 11434)
+- `api` - Express API server (port 3001)
+- `webui` - Nginx serving Vue.js build (port 80)
+
+**Volumes (persistent):**
+- `vector-retriever-qdrant-storage` - Qdrant database files
+- `vector-retriever-ollama-models` - Downloaded Ollama models
+
+**Internal networking:** Services communicate via Docker network. API container uses:
+- `OLLAMA_URL=http://ollama:11434/api/embed`
+- `QDRANT_URL=http://qdrant:6333`
+
+### GPU Support
+The Ollama container uses NVIDIA GPUs by default (requires `nvidia-container-toolkit`).
+
+For AMD/Intel GPUs, enable Vulkan in `.env`:
+```env
+OLLAMA_VULKAN=1
+```
+
+### Model Management
+The Ollama container startup script (`docker/ollama/startup.sh`):
+1. Starts Ollama server
+2. Pulls all models from env vars: `EMBEDDING_MODEL`, `PII_DETECTION_MODEL`, `VISION_MODEL`, `DESCRIPTION_MODEL`, `CATEGORIZATION_MODEL`
+3. Deletes any installed models not in the required list
+4. Models persist in the `ollama_models` volume
+
+### Standalone Services
+```bash
+# Ollama only (with GPU)
+docker compose -f docker/docker-compose.ollama.yml up -d
+
+# Qdrant only
+docker compose -f docker/docker-compose.qdrant.yml up -d
+```
+
 ## When Modifying Code
 
 ### Adding new search filters
@@ -1393,6 +1471,19 @@ E2E tests should not depend on downloading Ollama models or running real inferen
 
 ### Changing embedding model
 Update `.env` EMBEDDING_MODEL, re-run `npm run embed` (re-embeds all documents).
+
+### Adding new Ollama model env variables
+When adding a new env variable for an Ollama model (e.g., a new feature requiring a specific model):
+1. Add the env var to `.env.example` with documentation
+2. Add the env var to `docker/ollama/startup.sh` in the model collection section:
+   ```bash
+   add_model "$NEW_MODEL_ENV_VAR"
+   ```
+3. Add the env var to `docker/docker-compose.yml` in the `ollama` service environment
+4. Add the env var to `docker/docker-compose.ollama.yml` in the `ollama` service environment
+5. Document the new model in `.github/copilot-instructions.md` under "Key Configuration (.env)"
+
+**CRITICAL:** The Ollama Docker container automatically deletes models not referenced in env vars. Failing to add a new model env var to `startup.sh` will cause that model to be removed on container restart.
 
 ## Documentation Locations
 - **Documentation convention:** Keep project documentation in `docs/` (grouped by topic). Avoid adding new top-level `*.md` files in the repo root except `README.md`.

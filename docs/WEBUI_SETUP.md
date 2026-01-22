@@ -3,20 +3,21 @@
 Complete guide to setting up and using the Ollama-Qdrant Web UI.
 
 ## Table of Contents
-- [🚀 Quick Start (5 minutes)](#-quick-start-5-minutes)
-- [📖 Detailed Setup](#-detailed-setup)
-- [🎯 Using the Web UI](#-using-the-web-ui)
-- [🎨 UI Features](#-ui-features)
-- [🔧 Configuration](#-configuration)
-- [🐛 Troubleshooting](#-troubleshooting)
-- [📊 API Reference](#-api-reference)
-- [🚢 Production Deployment](#-production-deployment)
-- [💡 Tips & Best Practices](#-tips--best-practices)
-- [🎓 Learning Resources](#-learning-resources)
-- [🤝 Contributing](#-contributing)
-- [📝 License](#-license)
+- [Quick Start (5 minutes)](#quick-start-5-minutes)
+- [Docker Deployment](#docker-deployment)
+- [Detailed Setup](#detailed-setup)
+- [Using the Web UI](#using-the-web-ui)
+- [UI Features](#ui-features)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+- [API Reference](#api-reference)
+- [Production Deployment](#production-deployment)
+- [Tips & Best Practices](#tips--best-practices)
+- [Learning Resources](#learning-resources)
+- [Contributing](#contributing)
+- [License](#license)
 
-## 🚀 Quick Start (5 minutes)
+## Quick Start (5 minutes)
 
 ### Prerequisites Check
 
@@ -45,7 +46,73 @@ npm run webui
 
 That's it! Open http://localhost:5173 in your browser.
 
-## 📖 Detailed Setup
+## Docker Deployment
+
+For production deployment, use Docker Compose to run the full stack.
+
+### Prerequisites
+
+- Docker with Docker Compose v2
+- NVIDIA Container Toolkit (for GPU support)
+
+### Quick Start
+
+```bash
+# 1. Configure environment
+cp .env.example .env
+# Edit .env to set your models
+
+# 2. Start full stack
+docker compose -f docker/docker-compose.yml up -d
+
+# 3. View logs (optional)
+docker compose -f docker/docker-compose.yml logs -f
+```
+
+### Access Points
+
+- **Web UI**: http://localhost (port 80)
+- **API**: http://localhost:3001
+- **Qdrant Dashboard**: http://localhost:6333/dashboard
+
+### Services
+
+| Service | Description | Port |
+|---------|-------------|------|
+| `qdrant` | Vector database | 6333/6334 |
+| `ollama` | LLM server (GPU) | 11434 |
+| `api` | Express API | 3001 |
+| `webui` | Nginx + Vue.js | 80 |
+
+### GPU Support
+
+The Ollama container uses NVIDIA GPUs by default. For AMD/Intel GPUs:
+
+```env
+# In .env file
+OLLAMA_VULKAN=1
+```
+
+### Model Management
+
+Models are automatically managed:
+- All models in env vars are pulled on startup
+- Unused models are removed
+- Models persist in Docker volume
+
+### Headless LibreOffice
+
+The API container includes headless LibreOffice for legacy Office file conversion (.doc, .ppt, .xls, .odt, .odp, .ods). This is enabled by default in Docker deployment.
+
+### Stop Services
+
+```bash
+docker compose -f docker/docker-compose.yml down
+```
+
+See [docker/README.md](../docker/README.md) for detailed Docker documentation.
+
+## Detailed Setup
 
 ### Step 1: Install Dependencies
 
@@ -96,7 +163,7 @@ cd web-ui && npm run dev
 
 Open your browser to: **http://localhost:5173**
 
-## 🎯 Using the Web UI
+## Using the Web UI
 
 ### Search Types
 
@@ -162,7 +229,7 @@ Click "▼ Show More" to see:
 - Full metadata JSON
 - All available fields
 
-## 🎨 UI Features
+## UI Features
 
 ### Visual Elements
 
@@ -175,7 +242,7 @@ Click "▼ Show More" to see:
 
 - `Ctrl + Enter` in search box - Submit search
 
-## 🔧 Configuration
+## Configuration
 
 ### Change Ports
 
@@ -209,7 +276,7 @@ Edit [web-ui/src/style.css](src/style.css):
 }
 ```
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### "Cannot connect to API"
 
@@ -282,7 +349,7 @@ The API server has CORS enabled by default. If you still see errors:
 
 2. Restart the API server
 
-## 📊 API Reference
+## API Reference
 
 ### Endpoints
 
@@ -338,7 +405,7 @@ curl -X POST http://localhost:3001/api/search/geo \
   }'
 ```
 
-## 🚢 Production Deployment
+## Production Deployment
 
 ### Build for Production
 
@@ -386,7 +453,7 @@ Deploy `web-ui/dist/` to:
 
 Update API URL in production build.
 
-## 💡 Tips & Best Practices
+## Tips & Best Practices
 
 ### Performance
 
@@ -412,14 +479,14 @@ Update API URL in production build.
 - **Score 0.6-0.8** - Good match
 - **Score < 0.6** - Loosely related
 
-## 🎓 Learning Resources
+## Learning Resources
 
 - [Vue.js Documentation](https://vuejs.org/)
 - [Vite Documentation](https://vitejs.dev/)
 - [Express.js Guide](https://expressjs.com/)
 - [Qdrant Docs](https://qdrant.tech/documentation/)
 
-## 🤝 Contributing
+## Contributing
 
 Want to improve the UI? Consider:
 
@@ -442,7 +509,7 @@ Want to improve the UI? Consider:
    - User authentication
    - Multi-collection support
 
-## 📝 License
+## License
 
 MIT
 
