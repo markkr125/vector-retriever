@@ -4,10 +4,28 @@ Welcome to the Vector Retriever documentation! This folder contains comprehensiv
 
 ## Table of Contents
 - [📚 Documentation Files](#-documentation-files)
+- [� Docker Deployment](#-docker-deployment)
 - [🚀 Quick Navigation](#-quick-navigation)
 - [📖 Additional Resources](#-additional-resources)
 - [🎯 Common Tasks](#-common-tasks)
 - [💡 Tips](#-tips)
+
+## 🐳 Docker Deployment
+
+Deploy the full stack with a single command:
+
+```bash
+docker compose -f docker/docker-compose.yml up -d
+```
+
+See [Docker Management Guide](DOCKER_MANAGEMENT.md) for complete Docker documentation including:
+- Starting, stopping, and restarting services
+- GPU configuration (NVIDIA/Vulkan)
+- Model management
+- Volume backups and data management
+- Troubleshooting
+
+Also see [Docker Deployment Guide](DOCKER.md) for Docker deployment and configuration.
 
 ## 📚 Documentation Files
 

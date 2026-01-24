@@ -1,0 +1,157 @@
+# Vector Retriever - Full Stack Docker Compose
+# Brings up Qdrant, Ollama (with GPU), API server, and Web UI
+#
+# Usage (MUST run from project root where .env is located):
+#   cd /path/to/ollama-qdrant-experiment
+#   docker compose -f docker/docker-compose.yml up -d
+#
+# Prerequisites:
+#   - Docker with Docker Compose v2
+#   - NVIDIA Container Toolkit (for GPU support)
+#   - .env file in project root with model configuration
+
+services:
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: vector-retriever-qdrant
+    ports:
+      - "6333:6333"  # REST API and Dashboard
+      - "6334:6334"  # gRPC
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/6333' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - vector-retriever
+
+  # Ollama LLM Server with GPU support
+  ollama:
+    build:
+      context: ./ollama
+      dockerfile: Dockerfile
+    container_name: vector-retriever-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      # Model configuration - read from .env file
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-embeddinggemma:latest}
+      - PII_DETECTION_MODEL=${PII_DETECTION_MODEL:-}
+      - VISION_MODEL=${VISION_MODEL:-}
+      - DESCRIPTION_MODEL=${DESCRIPTION_MODEL:-}
+      - CATEGORIZATION_MODEL=${CATEGORIZATION_MODEL:-}
+      # Vulkan support (optional)
+      - OLLAMA_VULKAN=${OLLAMA_VULKAN:-}
+    restart: unless-stopped
+    # GPU support - requires nvidia-container-toolkit
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s  # Models take time to load
+    networks:
+      - vector-retriever
+
+  # Express API Server
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api/Dockerfile
+    container_name: vector-retriever-api
+    ports:
+      - "3001:3001"
+    environment:
+      # Override URLs to use internal Docker networking
+      - OLLAMA_URL=http://ollama:11434/api/embed
+      - QDRANT_URL=http://qdrant:6333
+      # Pass through other configuration from .env
+      - COLLECTION_NAME=${COLLECTION_NAME:-documents}
+      - SERVER_PORT=3001
+      - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-10}
+      - MAX_CLOUD_IMPORT_DOCS=${MAX_CLOUD_IMPORT_DOCS:-1000}
+      - MAX_CLOUD_IMPORT_SIZE_MB=${MAX_CLOUD_IMPORT_SIZE_MB:-500}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-embeddinggemma:latest}
+      - AUTH_TOKEN=${AUTH_TOKEN:-}
+      - GOOGLE_DRIVE_API_KEY=${GOOGLE_DRIVE_API_KEY:-}
+      - VIZ_CACHE_STRATEGY=memory
+      - VIZ_CACHE_TTL=${VIZ_CACHE_TTL:-3600000}
+      - CATEGORIZATION_MODEL=${CATEGORIZATION_MODEL:-}
+      - PII_DETECTION_ENABLED=${PII_DETECTION_ENABLED:-false}
+      - PII_DETECTION_METHOD=${PII_DETECTION_METHOD:-hybrid}
+      - PII_DETECTION_MODEL=${PII_DETECTION_MODEL:-}
+      - VISION_MODEL_ENABLED=${VISION_MODEL_ENABLED:-false}
+      - VISION_MODEL=${VISION_MODEL:-}
+      - DESCRIPTION_MODEL=${DESCRIPTION_MODEL:-}
+      - SUPPORTED_IMAGE_TYPES=${SUPPORTED_IMAGE_TYPES:-.jpg,.jpeg,.png,.gif,.webp,.bmp}
+      - AUTO_GENERATE_DESCRIPTION=${AUTO_GENERATE_DESCRIPTION:-true}
+      # LibreOffice is installed in the API container for legacy file conversion
+      - LIBREOFFICE_ENABLED=${LIBREOFFICE_ENABLED:-true}
+      - LIBREOFFICE_TIMEOUT_MS=${LIBREOFFICE_TIMEOUT_MS:-60000}
+      - LIBREOFFICE_MAX_CONCURRENCY=${LIBREOFFICE_MAX_CONCURRENCY:-2}
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - vector-retriever
+
+  # Web UI (nginx serving Vue.js build)
+  webui:
+    build:
+      context: ..
+      dockerfile: docker/webui/Dockerfile
+    container_name: vector-retriever-webui
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    networks:
+      - vector-retriever
+
+# Persistent volumes
+volumes:
+  qdrant_storage:
+    name: vector-retriever-qdrant-storage
+  ollama_models:
+    name: vector-retriever-ollama-models
+
+# Internal network for service communication
+networks:
+  vector-retriever:
+    name: vector-retriever-network
+    driver: bridge

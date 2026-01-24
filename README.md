@@ -11,6 +11,7 @@ General purpose vector database application showcasing **Qdrant's powerful featu
 - [Key Features Demonstrated](#-key-features-demonstrated)
 - [Prerequisites](#-prerequisites)
 - [Quick Start](#-quick-start)
+- [Docker Deployment](#-docker-deployment)
 - [Web UI](#-web-ui)
 - [Basic Usage](#-basic-usage)
 - [Usage Examples](#-usage-examples)
@@ -29,6 +30,7 @@ General purpose vector database application showcasing **Qdrant's powerful featu
 
 - **[Quick Reference](docs/QUICK_REFERENCE.md)** - Fast command reference and key features
 - **[Complete Summary](docs/SUMMARY.md)** - Comprehensive project overview
+- **[Docker Deployment](docs/DOCKER.md)** - GPU setup, external services, troubleshooting
 - **[Cloud Import Guide](docs/CLOUD_IMPORT.md)** - Import from S3/Google Drive with advanced filtering
 - **[Hybrid Search Implementation](docs/HYBRID_SEARCH_IMPLEMENTATION.md)** - Technical guide to weighted fusion, score normalization, and deep pagination
 - **[Mixed Dataset Guide](docs/MIXED_DATASET.md)** - Handling structured + unstructured documents
@@ -205,6 +207,62 @@ npm run demo
 ```bash
 node examples/examples.js
 ```
+
+## 🐳 Docker Deployment
+
+Deploy the entire stack with Docker Compose for production use.
+
+### Prerequisites
+
+- Docker with Docker Compose v2
+- GPU support (optional but recommended):
+  - **NVIDIA**: Requires [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
+  - **AMD/Intel**: Requires Vulkan drivers (`sudo apt install mesa-vulkan-drivers`)
+
+### Quick Start (Recommended)
+
+Use the auto-detect script - it automatically selects the right compose file for your GPU:
+
+```bash
+# Configure your models in .env
+cp .env.example .env
+# Edit .env to set EMBEDDING_MODEL and other model settings
+
+# Start with auto-detected GPU (recommended)
+./docker/start.sh
+
+# Other commands
+./docker/start.sh stop      # Stop services
+./docker/start.sh logs      # View logs
+./docker/start.sh models    # List installed models
+./docker/start.sh pull-status  # Check model download progress
+```
+
+### Manual Start
+
+```bash
+# Choose based on your GPU:
+docker compose -f docker/docker-compose.yml up -d         # NVIDIA GPU
+docker compose -f docker/docker-compose.vulkan.yml up -d  # AMD/Intel GPU (Vulkan)
+docker compose -f docker/docker-compose.cpu.yml up -d     # No GPU (CPU only)
+```
+
+### Access Points
+
+- **Web UI**: http://localhost:8080
+- **API**: http://localhost:3001
+- **Qdrant Dashboard**: http://localhost:6333/dashboard
+
+### First Start: Wait for Model Downloads
+
+⚠️ On first startup, Ollama downloads models in the background. This can take several minutes. If you get "model not found" or 400 errors, wait for downloads to complete:
+
+```bash
+./docker/start.sh models       # Check what's installed
+./docker/start.sh pull-status  # Check download progress
+```
+
+See [Docker Deployment Guide](docs/DOCKER.md) for detailed Docker documentation, GPU setup, and troubleshooting.
 
 ## 🌐 Web UI
 

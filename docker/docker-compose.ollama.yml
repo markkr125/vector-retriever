@@ -1,0 +1,48 @@
+# Ollama Standalone Docker Compose
+# Run Ollama with GPU support independently
+#
+# Usage:
+#   docker compose -f docker/docker-compose.ollama.yml up -d
+#
+# Prerequisites:
+#   - NVIDIA Container Toolkit (for GPU support)
+#   - .env file in project root with model configuration
+
+services:
+  ollama:
+    build:
+      context: ./ollama
+      dockerfile: Dockerfile
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      # Model configuration - read from .env file
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-embeddinggemma:latest}
+      - PII_DETECTION_MODEL=${PII_DETECTION_MODEL:-}
+      - VISION_MODEL=${VISION_MODEL:-}
+      - DESCRIPTION_MODEL=${DESCRIPTION_MODEL:-}
+      - CATEGORIZATION_MODEL=${CATEGORIZATION_MODEL:-}
+      # Vulkan support (optional)
+      - OLLAMA_VULKAN=${OLLAMA_VULKAN:-}
+    restart: unless-stopped
+    # GPU support - requires nvidia-container-toolkit
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  ollama_models:
+    name: ollama-models
