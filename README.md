@@ -214,44 +214,54 @@ Deploy the entire stack with Docker Compose for production use.
 ### Prerequisites
 
 - Docker with Docker Compose v2
-- NVIDIA Container Toolkit (for GPU support with Ollama)
+- GPU support (optional but recommended):
+  - **NVIDIA**: Requires [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
+  - **AMD/Intel**: Requires Vulkan drivers (`sudo apt install mesa-vulkan-drivers`)
 
-### Quick Start
+### Quick Start (Recommended)
+
+Use the auto-detect script - it automatically selects the right compose file for your GPU:
 
 ```bash
 # Configure your models in .env
 cp .env.example .env
 # Edit .env to set EMBEDDING_MODEL and other model settings
 
-# Start full stack (Qdrant + Ollama + API + Web UI)
-docker compose -f docker/docker-compose.yml up -d
+# Start with auto-detected GPU (recommended)
+./docker/start.sh
 
-# View logs
-docker compose -f docker/docker-compose.yml logs -f
+# Other commands
+./docker/start.sh stop      # Stop services
+./docker/start.sh logs      # View logs
+./docker/start.sh models    # List installed models
+./docker/start.sh pull-status  # Check model download progress
 ```
 
-Access:
-- **Web UI**: http://localhost
+### Manual Start
+
+```bash
+# Choose based on your GPU:
+docker compose -f docker/docker-compose.yml up -d         # NVIDIA GPU
+docker compose -f docker/docker-compose.vulkan.yml up -d  # AMD/Intel GPU (Vulkan)
+docker compose -f docker/docker-compose.cpu.yml up -d     # No GPU (CPU only)
+```
+
+### Access Points
+
+- **Web UI**: http://localhost:8080
 - **API**: http://localhost:3001
 - **Qdrant Dashboard**: http://localhost:6333/dashboard
 
-### GPU Support
+### First Start: Wait for Model Downloads
 
-The Ollama container automatically uses NVIDIA GPUs if available. For AMD/Intel GPUs, enable Vulkan:
+⚠️ On first startup, Ollama downloads models in the background. This can take several minutes. If you get "model not found" or 400 errors, wait for downloads to complete:
 
-```env
-# In .env file
-OLLAMA_VULKAN=1
+```bash
+./docker/start.sh models       # Check what's installed
+./docker/start.sh pull-status  # Check download progress
 ```
 
-### Model Management
-
-The Ollama container automatically:
-- Pulls all models specified in env vars on startup
-- Removes unused models not referenced in env vars
-- Persists models in a Docker volume
-
-See [docker/README.md](docker/README.md) for detailed Docker documentation.
+See [docker/README.md](docker/README.md) for detailed Docker documentation, GPU setup, and troubleshooting.
 
 ## 🌐 Web UI
 

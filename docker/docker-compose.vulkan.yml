@@ -1,14 +1,18 @@
-# Vector Retriever - Full Stack Docker Compose
-# Brings up Qdrant, Ollama (with GPU), API server, and Web UI
+# Vector Retriever - Full Stack Docker Compose (AMD/Intel GPU via Vulkan)
+# Uses Vulkan API for GPU acceleration on non-NVIDIA GPUs
 #
 # Usage (MUST run from project root where .env is located):
 #   cd /path/to/ollama-qdrant-experiment
-#   docker compose -f docker/docker-compose.yml up -d
+#   docker compose -f docker/docker-compose.vulkan.yml up -d
 #
 # Prerequisites:
 #   - Docker with Docker Compose v2
-#   - NVIDIA Container Toolkit (for GPU support)
+#   - AMD or Intel GPU with Vulkan support
+#   - Vulkan drivers installed on host (mesa-vulkan-drivers on Ubuntu/Debian)
 #   - .env file in project root with model configuration
+#
+# To verify Vulkan support on host:
+#   vulkaninfo | head -20
 
 services:
   # Qdrant Vector Database
@@ -34,7 +38,7 @@ services:
     networks:
       - vector-retriever
 
-  # Ollama LLM Server with GPU support
+  # Ollama LLM Server (AMD/Intel GPU via Vulkan)
   ollama:
     build:
       context: ./ollama
@@ -44,6 +48,9 @@ services:
       - "11434:11434"
     volumes:
       - ollama_models:/root/.ollama
+    # Mount GPU devices for Vulkan access
+    devices:
+      - /dev/dri:/dev/dri
     environment:
       # Model configuration - read from .env file
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-embeddinggemma:latest}
@@ -51,17 +58,10 @@ services:
       - VISION_MODEL=${VISION_MODEL:-}
       - DESCRIPTION_MODEL=${DESCRIPTION_MODEL:-}
       - CATEGORIZATION_MODEL=${CATEGORIZATION_MODEL:-}
-      # Vulkan support (optional)
-      - OLLAMA_VULKAN=${OLLAMA_VULKAN:-}
+      - RERANKING_MODEL=${RERANKING_MODEL:-}
+      # Enable Vulkan for AMD/Intel GPU acceleration
+      - OLLAMA_VULKAN=1
     restart: unless-stopped
-    # GPU support - requires nvidia-container-toolkit
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
       interval: 30s
@@ -103,6 +103,11 @@ services:
       - DESCRIPTION_MODEL=${DESCRIPTION_MODEL:-}
       - SUPPORTED_IMAGE_TYPES=${SUPPORTED_IMAGE_TYPES:-.jpg,.jpeg,.png,.gif,.webp,.bmp}
       - AUTO_GENERATE_DESCRIPTION=${AUTO_GENERATE_DESCRIPTION:-true}
+      - RERANKING_ENABLED=${RERANKING_ENABLED:-false}
+      - RERANKING_MODEL=${RERANKING_MODEL:-}
+      - RERANKING_TOP_K=${RERANKING_TOP_K:-50}
+      - RERANKING_BATCH_SIZE=${RERANKING_BATCH_SIZE:-5}
+      - RERANKING_TIMEOUT_MS=${RERANKING_TIMEOUT_MS:-30000}
       # LibreOffice is installed in the API container for legacy file conversion
       - LIBREOFFICE_ENABLED=${LIBREOFFICE_ENABLED:-true}
       - LIBREOFFICE_TIMEOUT_MS=${LIBREOFFICE_TIMEOUT_MS:-60000}
@@ -129,7 +134,7 @@ services:
       dockerfile: docker/webui/Dockerfile
     container_name: vector-retriever-webui
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       api:
         condition: service_healthy

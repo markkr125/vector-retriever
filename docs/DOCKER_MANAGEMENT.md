@@ -17,7 +17,8 @@ Complete guide for managing the Vector Retriever Docker deployment.
 
 | Command | Description |
 |---------|-------------|
-| `docker compose -f docker/docker-compose.yml up -d` | Start full stack |
+| `docker compose -f docker/docker-compose.yml up -d` | Start full stack (GPU) |
+| `docker compose -f docker/docker-compose.cpu.yml up -d` | Start full stack (CPU only) |
 | `docker compose -f docker/docker-compose.yml down` | Stop services (keep data) |
 | `docker compose -f docker/docker-compose.yml down -v` | Stop and delete all data |
 | `docker compose -f docker/docker-compose.yml logs -f` | View live logs |
@@ -26,12 +27,21 @@ Complete guide for managing the Vector Retriever Docker deployment.
 
 ## Starting Services
 
-### Full Stack (Recommended)
+### Full Stack with GPU (Default)
 
 ```bash
-# Start all services (Qdrant, Ollama, API, WebUI)
+# Start all services (Qdrant, Ollama, API, WebUI) - requires NVIDIA GPU
 docker compose -f docker/docker-compose.yml up -d
 ```
+
+### Full Stack without GPU (CPU Only)
+
+```bash
+# Start all services without GPU acceleration
+docker compose -f docker/docker-compose.cpu.yml up -d
+```
+
+> **Note:** CPU-only mode is slower for inference but works on any system.
 
 Access points:
 - **Web UI**: http://localhost
@@ -255,18 +265,13 @@ OLLAMA_VULKAN=1
 
 ### CPU Only (No GPU)
 
-Remove the GPU reservation from `docker/docker-compose.yml`:
+Use the CPU override file:
 
-```yaml
-# Comment out or remove this section in the ollama service:
-# deploy:
-#   resources:
-#     reservations:
-#       devices:
-#         - driver: nvidia
-#           count: all
-#           capabilities: [gpu]
+```bash
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.cpu.yml up -d
 ```
+
+This removes the GPU reservation and runs Ollama on CPU only (slower but works everywhere).
 
 ## Troubleshooting
 

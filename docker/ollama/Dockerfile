@@ -1,6 +1,9 @@
 # Ollama container with GPU support and automatic model management
 FROM ollama/ollama:latest
 
+# Install curl for health checks and model management
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 # Copy startup script
 COPY startup.sh /startup.sh
 RUN chmod +x /startup.sh

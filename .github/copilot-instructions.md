@@ -36,11 +36,15 @@ Vue.js Web UI (port 5173) ←→ Express API (port 3001) ←→ Qdrant DB (port 
 ### Docker Directory Structure
 ```
 docker/
-├── docker-compose.yml           # Full stack (Qdrant + Ollama + API + WebUI)
+├── start.sh                     # Auto-detect GPU and start (recommended)
+├── README.md                    # Comprehensive Docker documentation
+├── docker-compose.yml           # NVIDIA GPU (requires nvidia-container-toolkit)
+├── docker-compose.vulkan.yml    # AMD/Intel GPU via Vulkan
+├── docker-compose.cpu.yml       # Pure CPU (no GPU acceleration)
 ├── docker-compose.ollama.yml    # Ollama standalone with GPU support
 ├── docker-compose.qdrant.yml    # Qdrant standalone
 ├── ollama/
-│   ├── Dockerfile               # Ollama with model management
+│   ├── Dockerfile               # Ollama with model management + curl
 │   └── startup.sh               # Auto-pull/cleanup models based on env vars
 ├── api/
 │   └── Dockerfile               # Express API server + headless LibreOffice
@@ -96,11 +100,23 @@ npm run webui  # Opens http://localhost:5173 (auto-starts server on 3001)
 cp .env.example .env
 # Edit .env: Set EMBEDDING_MODEL and any optional models
 
-# 2. Start full stack with Docker Compose
-docker compose -f docker/docker-compose.yml up -d
+# 2. Start full stack with Docker Compose (MUST run from project root)
+cd /path/to/ollama-qdrant-experiment
 
-# 3. Access the application
-# Web UI: http://localhost
+# Choose based on your GPU:
+docker compose -f docker/docker-compose.yml up -d         # NVIDIA GPU
+docker compose -f docker/docker-compose.vulkan.yml up -d  # AMD/Intel GPU (Vulkan)
+docker compose -f docker/docker-compose.cpu.yml up -d     # No GPU (CPU only)
+
+# Or use the auto-detect script (recommended):
+./docker/start.sh
+
+# 3. Wait for model downloads (5-30 minutes on first start)
+./docker/start.sh models       # Check installed models
+./docker/start.sh pull-status  # Check download progress
+
+# 4. Access the application
+# Web UI: http://localhost:8080
 # API: http://localhost:3001
 # Qdrant Dashboard: http://localhost:6333/dashboard
 ```
@@ -1410,17 +1426,47 @@ E2E tests should not depend on downloading Ollama models or running real inferen
 
 ## Docker Deployment
 
-### Full Stack Deployment
+### ⚠️ Critical: Run from Project Root
+Docker Compose must be run from the **project root** directory where `.env` is located:
+```bash
+cd /path/to/ollama-qdrant-experiment  # Contains .env file
+./docker/start.sh                      # Recommended: auto-detects GPU
+```
+Running from the `docker/` subdirectory will fail to load environment variables.
+
+### Quick Start with Auto-Detection (Recommended)
+The `docker/start.sh` script auto-detects your GPU and selects the appropriate compose file:
+```bash
+./docker/start.sh           # Start (auto-detect GPU)
+./docker/start.sh stop      # Stop all services
+./docker/start.sh logs      # Follow logs
+./docker/start.sh status    # Container status
+./docker/start.sh restart   # Restart all services
+./docker/start.sh models    # List installed Ollama models
+./docker/start.sh pull-status  # Check model download progress
+
+# Force specific GPU mode
+./docker/start.sh --gpu nvidia   # Force NVIDIA
+./docker/start.sh --gpu amd      # Force AMD/Intel Vulkan
+./docker/start.sh --gpu cpu      # Force CPU only
+```
+
+### Manual Deployment
+Choose the right compose file for your GPU:
 ```bash
 # From project root
-docker compose -f docker/docker-compose.yml up -d
+docker compose --env-file .env -f docker/docker-compose.yml up -d         # NVIDIA GPU
+docker compose --env-file .env -f docker/docker-compose.vulkan.yml up -d  # AMD/Intel GPU (Vulkan)
+docker compose --env-file .env -f docker/docker-compose.cpu.yml up -d     # No GPU (CPU only)
 ```
+
+**Note:** Always include `--env-file .env` to ensure environment variables are loaded.
 
 **Services:**
 - `qdrant` - Vector database (ports 6333/6334)
 - `ollama` - LLM server with GPU support (port 11434)
 - `api` - Express API server (port 3001)
-- `webui` - Nginx serving Vue.js build (port 80)
+- `webui` - Nginx serving Vue.js build (port 8080)
 
 **Volumes (persistent):**
 - `vector-retriever-qdrant-storage` - Qdrant database files
@@ -1431,28 +1477,71 @@ docker compose -f docker/docker-compose.yml up -d
 - `QDRANT_URL=http://qdrant:6333`
 
 ### GPU Support
-The Ollama container uses NVIDIA GPUs by default (requires `nvidia-container-toolkit`).
 
-For AMD/Intel GPUs, enable Vulkan in `.env`:
-```env
-OLLAMA_VULKAN=1
+**NVIDIA GPU:** Requires `nvidia-container-toolkit`:
+```bash
+# Install nvidia-container-toolkit
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+  sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
 ```
+
+**AMD/Intel GPU (Vulkan):** Uses `/dev/dri` device:
+```bash
+# Install Vulkan drivers
+sudo apt-get install mesa-vulkan-drivers vulkan-tools
+# Uses docker-compose.vulkan.yml with OLLAMA_VULKAN=1
+```
+
+**CPU Only:** No GPU required, uses `docker-compose.cpu.yml`. Significantly slower (10-100x).
 
 ### Model Management
 The Ollama container startup script (`docker/ollama/startup.sh`):
 1. Starts Ollama server
-2. Pulls all models from env vars: `EMBEDDING_MODEL`, `PII_DETECTION_MODEL`, `VISION_MODEL`, `DESCRIPTION_MODEL`, `CATEGORIZATION_MODEL`
+2. Pulls all models from env vars: `EMBEDDING_MODEL`, `PII_DETECTION_MODEL`, `VISION_MODEL`, `DESCRIPTION_MODEL`, `CATEGORIZATION_MODEL`, `RERANKING_MODEL`
 3. Deletes any installed models not in the required list
 4. Models persist in the `ollama_models` volume
+
+**⚠️ Model Download Time:** After first start, Ollama downloads models in the background. This takes 5-30 minutes depending on model size. Getting "model not found" or "status 400" errors? Wait for downloads to complete:
+```bash
+./docker/start.sh models       # Check what's installed
+./docker/start.sh pull-status  # Check download progress
+./docker/start.sh logs         # Watch live logs
+```
 
 ### Standalone Services
 ```bash
 # Ollama only (with GPU)
-docker compose -f docker/docker-compose.ollama.yml up -d
+docker compose --env-file .env -f docker/docker-compose.ollama.yml up -d
 
 # Qdrant only
-docker compose -f docker/docker-compose.qdrant.yml up -d
+docker compose --env-file .env -f docker/docker-compose.qdrant.yml up -d
 ```
+
+### Docker Troubleshooting
+
+**"Model not found" or "status 400" errors:**
+- Models are downloading in background after first startup
+- Check progress: `./docker/start.sh pull-status`
+- Wait 5-30 minutes for downloads to complete
+
+**Environment variables not loading:**
+- Must run from project root (where `.env` is)
+- Use `--env-file .env` with manual docker compose commands
+- Verify: `docker inspect vector-retriever-ollama --format '{{range .Config.Env}}{{println .}}{{end}}' | grep MODEL`
+
+**NVIDIA "could not select device driver" error:**
+- Install nvidia-container-toolkit (see GPU Support above)
+- Restart Docker: `sudo systemctl restart docker`
+- Verify: `docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi`
+
+**GPU not being used (slow inference):**
+- Check GPU mode: `./docker/start.sh` reports detected GPU type
+- Check Ollama logs: `docker logs vector-retriever-ollama 2>&1 | grep -i gpu`
 
 ## When Modifying Code
 

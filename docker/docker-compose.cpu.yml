@@ -1,14 +1,16 @@
-# Vector Retriever - Full Stack Docker Compose
-# Brings up Qdrant, Ollama (with GPU), API server, and Web UI
+# Vector Retriever - Full Stack Docker Compose (CPU Only)
+# Pure CPU mode - no GPU acceleration at all
 #
 # Usage (MUST run from project root where .env is located):
 #   cd /path/to/ollama-qdrant-experiment
-#   docker compose -f docker/docker-compose.yml up -d
+#   docker compose -f docker/docker-compose.cpu.yml up -d
 #
-# Prerequisites:
-#   - Docker with Docker Compose v2
-#   - NVIDIA Container Toolkit (for GPU support)
-#   - .env file in project root with model configuration
+# Use this if you have no GPU or want to run purely on CPU.
+# Note: CPU inference is significantly slower than GPU.
+#
+# For GPU options see:
+#   - docker-compose.yml      (NVIDIA GPU)
+#   - docker-compose.vulkan.yml  (AMD/Intel GPU via Vulkan)
 
 services:
   # Qdrant Vector Database
@@ -34,7 +36,7 @@ services:
     networks:
       - vector-retriever
 
-  # Ollama LLM Server with GPU support
+  # Ollama LLM Server (CPU only - no GPU acceleration)
   ollama:
     build:
       context: ./ollama
@@ -51,17 +53,10 @@ services:
       - VISION_MODEL=${VISION_MODEL:-}
       - DESCRIPTION_MODEL=${DESCRIPTION_MODEL:-}
       - CATEGORIZATION_MODEL=${CATEGORIZATION_MODEL:-}
-      # Vulkan support (optional)
-      - OLLAMA_VULKAN=${OLLAMA_VULKAN:-}
+      - RERANKING_MODEL=${RERANKING_MODEL:-}
+      # Vulkan disabled - pure CPU mode
+      - OLLAMA_VULKAN=0
     restart: unless-stopped
-    # GPU support - requires nvidia-container-toolkit
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
       interval: 30s
@@ -129,7 +124,7 @@ services:
       dockerfile: docker/webui/Dockerfile
     container_name: vector-retriever-webui
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       api:
         condition: service_healthy
