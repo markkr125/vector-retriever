@@ -1448,7 +1448,7 @@ The `docker/start.sh` script auto-detects your GPU and selects the appropriate c
 
 # Force specific GPU mode
 ./docker/start.sh --gpu nvidia   # Force NVIDIA
-./docker/start.sh --gpu amd      # Force AMD/Intel Vulkan
+./docker/start.sh --gpu vulkan   # Force AMD/Intel Vulkan
 ./docker/start.sh --gpu cpu      # Force CPU only
 ```
 

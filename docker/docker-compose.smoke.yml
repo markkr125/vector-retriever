@@ -1,0 +1,88 @@
+# Vector Retriever - Docker Smoke Test (CI)
+# Minimal compose file intended for CI validation.
+# Starts Qdrant + API, and points the API at a mock Ollama running on the host.
+#
+# Usage (from project root):
+#   node scripts/mock-ollama-server.js &
+#   docker compose -f docker/docker-compose.smoke.yml up -d --build
+#   curl -f http://localhost:3001/api/health
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: vector-retriever-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/6333' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - vector-retriever
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api/Dockerfile
+    container_name: vector-retriever-api
+    ports:
+      - "3001:3001"
+    environment:
+      # Point to mock Ollama running on the host (GitHub runner)
+      - OLLAMA_URL=http://host.docker.internal:11434/api/embed
+      - QDRANT_URL=http://qdrant:6333
+      - COLLECTION_NAME=${COLLECTION_NAME:-documents}
+      - SERVER_PORT=3001
+      - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-10}
+      - MAX_CLOUD_IMPORT_DOCS=${MAX_CLOUD_IMPORT_DOCS:-1000}
+      - MAX_CLOUD_IMPORT_SIZE_MB=${MAX_CLOUD_IMPORT_SIZE_MB:-500}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-mock-embed}
+      - AUTH_TOKEN=${AUTH_TOKEN:-}
+      - GOOGLE_DRIVE_API_KEY=${GOOGLE_DRIVE_API_KEY:-}
+      - VIZ_CACHE_STRATEGY=memory
+      - VIZ_CACHE_TTL=${VIZ_CACHE_TTL:-3600000}
+      - CATEGORIZATION_MODEL=${CATEGORIZATION_MODEL:-}
+      - PII_DETECTION_ENABLED=${PII_DETECTION_ENABLED:-false}
+      - PII_DETECTION_METHOD=${PII_DETECTION_METHOD:-hybrid}
+      - PII_DETECTION_MODEL=${PII_DETECTION_MODEL:-}
+      - VISION_MODEL_ENABLED=${VISION_MODEL_ENABLED:-false}
+      - VISION_MODEL=${VISION_MODEL:-}
+      - DESCRIPTION_MODEL=${DESCRIPTION_MODEL:-}
+      - SUPPORTED_IMAGE_TYPES=${SUPPORTED_IMAGE_TYPES:-.jpg,.jpeg,.png,.gif,.webp,.bmp}
+      - AUTO_GENERATE_DESCRIPTION=${AUTO_GENERATE_DESCRIPTION:-true}
+      - LIBREOFFICE_ENABLED=${LIBREOFFICE_ENABLED:-true}
+      - LIBREOFFICE_TIMEOUT_MS=${LIBREOFFICE_TIMEOUT_MS:-60000}
+      - LIBREOFFICE_MAX_CONCURRENCY=${LIBREOFFICE_MAX_CONCURRENCY:-2}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - vector-retriever
+
+volumes:
+  qdrant_storage:
+    name: vector-retriever-qdrant-storage
+
+networks:
+  vector-retriever:
+    name: vector-retriever-network
+    driver: bridge
