@@ -1,0 +1,479 @@
+@use '../../base/variables' as *;
+@use '../../base/mixins' as *;
+
+// ========================
+// Content Tabs
+// ========================
+
+.content-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid $color-border;
+}
+
+.tab-btn {
+  @include button-base($padding: 0.75rem 1.5rem);
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: $color-text-muted;
+  position: relative;
+  margin-bottom: -2px;
+
+  &:hover:not(.active) {
+    color: $color-text;
+    background: rgba(79, 70, 229, 0.05);
+  }
+
+  &.active {
+    color: $color-primary;
+    border-bottom-color: $color-primary;
+    font-weight: 600;
+  }
+}
+
+.tab-content {
+  padding: 1rem 0;
+}
+
+// ========================
+// Overview Tab
+// ========================
+.overview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+
+  h4 {
+    margin: 0;
+  }
+}
+
+.btn-refresh {
+  @include button-base($padding: 0.5rem 1rem, $radius: $radius-md);
+  background: $gradient-brand;
+  color: $color-white;
+  font-weight: 500;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+
+  @include lift-hover($y: -2px, $shadow: 0 4px 12px rgba(102, 126, 234, 0.4));
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, #5568d3, #6a4291);
+  }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    background: linear-gradient(135deg, #9ca3af, #6b7280);
+  }
+}
+
+// ========================
+// Description States
+// ========================
+.description-loading {
+  background: $color-bg;
+  padding: 1.25rem;
+  border-radius: $radius-lg;
+  margin-bottom: 1rem;
+
+  .skeleton-line {
+    height: 16px;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: vr-shimmer 1.5s ease-in-out infinite;
+    border-radius: $radius-sm;
+    margin-bottom: 0.75rem;
+
+    &.short {
+      width: 70%;
+    }
+  }
+}
+
+.description-content {
+  background: $color-bg;
+  padding: 1.25rem;
+  border-radius: $radius-lg;
+  margin-bottom: 1rem;
+
+  p {
+    color: $color-text;
+    line-height: 1.8;
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  strong {
+    font-weight: 600;
+    color: $color-text;
+  }
+
+  ul, ol {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+    color: $color-text;
+  }
+
+  li {
+    margin: 0.25rem 0;
+    line-height: 1.6;
+  }
+}
+
+.no-description {
+  background: $color-bg;
+  padding: 1.25rem;
+  border-radius: $radius-lg;
+  border: 2px dashed $color-border;
+  text-align: center;
+  color: $color-text-muted;
+  font-style: italic;
+}
+
+// ========================
+// Metadata Info
+// ========================
+.metadata-info {
+  background: $color-bg;
+  padding: 0.75rem;
+  border-radius: $radius-md;
+  font-size: 0.9rem;
+  color: $color-text-muted;
+  margin-top: 1rem;
+
+  &.language-badge {
+    background: transparent;
+    padding: 0;
+    margin-top: 0;
+    margin-bottom: 1rem;
+
+    .badge {
+      display: inline-block;
+      padding: 0.4rem 0.8rem;
+      background: $gradient-brand;
+      color: $color-white;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  strong {
+    color: $color-text;
+  }
+}
+
+// ========================
+// Info/Error Messages
+// ========================
+.info-message {
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+  @include status-banner(
+    $bg: $bg-info-soft,
+    $border-color: $color-info,
+    $text-color: $color-info,
+    $border-left: false,
+    $border-size: 1px,
+    $radius: $radius-md,
+    $padding: 0.75rem
+  );
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.error-message {
+  margin-top: 0.75rem;
+  @include status-banner(
+    $bg: $bg-error-soft,
+    $border-color: $color-error,
+    $text-color: $color-error,
+    $border-left: false,
+    $border-size: 1px,
+    $radius: $radius-md,
+    $padding: 0.75rem
+  );
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+// ========================
+// Full Content Tab
+// ========================
+.content-text,
+.metadata-json {
+  background: $color-bg;
+  padding: 1rem;
+  border-radius: $radius-lg;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow-x: auto;
+  max-width: 100%;
+  color: $color-text;
+}
+
+.metadata-json {
+  max-height: 400px;
+  overflow-y: auto;
+
+  @include scrollbars($size: 6px);
+}
+
+// ========================
+// Markdown Content
+// ========================
+.content-markdown {
+  background: $color-bg;
+  padding: 1.5rem;
+  border-radius: $radius-lg;
+  line-height: 1.8;
+  color: $color-text;
+  max-width: 100%;
+  overflow-x: auto;
+
+  h1, h2, h3, h4, h5, h6 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+    color: $color-text;
+    line-height: 1.3;
+  }
+
+  h1 {
+    font-size: 1.75rem;
+    border-bottom: 2px solid $color-border;
+    padding-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    border-bottom: 1px solid $color-border;
+    padding-bottom: 0.4rem;
+  }
+
+  h3 { font-size: 1.25rem; }
+  h4 { font-size: 1.1rem; }
+  h5 { font-size: 1rem; }
+  h6 { font-size: 0.9rem; color: $color-text-muted; }
+
+  p {
+    margin-bottom: 1rem;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  ul, ol {
+    margin-bottom: 1rem;
+    padding-left: 2rem;
+  }
+
+  li {
+    margin-bottom: 0.5rem;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    overflow-x: auto;
+    display: block;
+  }
+
+  th, td {
+    border: 1px solid $color-border;
+    padding: 0.75rem;
+    text-align: left;
+  }
+
+  th {
+    background: $color-bg;
+    font-weight: 600;
+    color: $color-text;
+  }
+
+  tr:nth-child(even) {
+    background: rgba(0, 0, 0, 0.02);
+  }
+
+  code {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+  }
+
+  pre {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 1rem;
+    border-radius: $radius-md;
+    overflow-x: auto;
+    margin: 1rem 0;
+
+    code {
+      background: none;
+      padding: 0;
+    }
+  }
+
+  blockquote {
+    border-left: 4px solid $color-primary;
+    padding-left: 1rem;
+    margin: 1rem 0;
+    color: $color-text-muted;
+    font-style: italic;
+  }
+
+  hr {
+    border: none;
+    border-top: 2px solid $color-border;
+    margin: 2rem 0;
+  }
+
+  a {
+    color: $color-primary;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.all-metadata {
+  margin-top: 1.5rem;
+}
+
+// ========================
+// PII Section (Inline)
+// ========================
+.pii-inline-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.pii-warning-badge-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  background: linear-gradient(135deg, $color-warning, $color-danger-accent);
+  border: 2px solid $color-danger-accent;
+  border-radius: $radius-md;
+  color: $color-white;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all $transition;
+  white-space: nowrap;
+
+  &:hover {
+    @include lift-hover($shadow: 0 4px 12px rgba($color-danger-accent, 0.3));
+  }
+
+  &.risk-low {
+    background: linear-gradient(135deg, $color-success-accent, #45a049);
+    border-color: $color-success-accent;
+  }
+
+  &.risk-medium {
+    background: linear-gradient(135deg, $color-warning, $color-warning-hover);
+    border-color: $color-warning;
+  }
+
+  &.risk-high {
+    background: linear-gradient(135deg, $color-danger-accent, $color-danger-accent-hover);
+    border-color: $color-danger-accent;
+  }
+
+  &.risk-critical {
+    background: linear-gradient(135deg, $color-critical-accent, $color-critical-accent-hover);
+    border-color: $color-critical-accent;
+    animation: vr-pulse 2s infinite;
+  }
+
+  .pii-icon {
+    font-size: 1rem;
+  }
+
+  .pii-text {
+    font-size: 0.85rem;
+  }
+
+  .pii-count {
+    background: rgba(255, 255, 255, 0.3);
+    padding: 0.15rem 0.4rem;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+}
+
+.btn-scan-pii-inline {
+  @include button-base($padding: 0.5rem 0.9rem, $radius: $radius-sm);
+  background: $color-danger-accent;
+  color: $color-white;
+  font-weight: 500;
+  font-size: 0.85rem;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    background: $color-danger-accent-hover;
+  }
+
+  &.already-scanned {
+    background: #666;
+
+    &:hover:not(:disabled) {
+      background: #555;
+    }
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+// Legacy PII Scan Section
+.pii-scan-section {
+  margin: 1rem 0;
+}
+
+.btn-scan-pii {
+  @include button-base($padding: 0.75rem 1rem, $radius: $radius-lg);
+  width: 100%;
+  background: $color-primary;
+  color: $color-white;
+  font-weight: 500;
+
+  @include lift-hover($y: -2px, $shadow: 0 4px 12px rgba(66, 133, 244, 0.3));
+
+  &:hover:not(:disabled) {
+    background: $color-primary-dark;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}

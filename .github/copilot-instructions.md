@@ -215,7 +215,8 @@ web-ui/src/scss/
     ├── layout/                  # App.scss
     ├── modals/                  # UploadModal.scss, PIIDetailsModal.scss, etc.
     ├── notifications/           # ScanNotification.scss
-    ├── search/                  # SearchForm.scss, ResultsList.scss, FacetBar.scss
+    ├── results/                 # ResultsList.scss (modular with _partials)
+    ├── search/                  # SearchForm.scss, FacetBar.scss
     ├── sidebar/                 # FacetsSidebar.scss
     └── visualization/           # DocumentClusterView.scss
 ```
@@ -291,6 +292,16 @@ web-ui/src/scss/
 ```
 
 5. **Keep nesting shallow (max 3-4 levels)**
+
+6. **Never use deprecated Sass features:**
+```scss
+// ❌ FORBIDDEN - @import is deprecated
+@import 'variables';
+
+// ✅ REQUIRED - Use @use/@forward
+@use '../../base/variables' as *;
+@forward 'Partial';
+```
 
 **Key Variables (see `_variables.scss` for full list):**
 - Colors: `$color-primary`, `$color-secondary`, `$color-text`, `$color-text-muted`, `$color-bg`, `$color-surface`, `$color-border`, `$color-error`, `$color-warning`, `$color-info`

@@ -1,0 +1,127 @@
+@use '../../base/variables' as *;
+@use '../../base/mixins' as *;
+
+// ========================
+// Browse Controls
+// ========================
+
+.browse-controls-inline {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+// ========================
+// Filter Menu Section
+// ========================
+.filter-menu-section {
+  padding: 1rem;
+  background: $color-white;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+
+  .filter-menu-header {
+    margin-bottom: 0.75rem;
+  }
+
+  .filter-menu-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: $color-text-muted;
+  }
+
+  .filter-menu-content {
+    display: flex;
+    align-items: center;
+  }
+}
+
+// ========================
+// Control Elements
+// ========================
+.control-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: $color-text-muted;
+  white-space: nowrap;
+}
+
+.control-select {
+  @include input-base($padding: 0.4rem 0.75rem, $radius: $radius-md);
+  font-size: 0.9rem;
+  cursor: pointer;
+
+  &:hover {
+    border-color: $color-primary;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $color-primary;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  }
+}
+
+// ========================
+// Filename Filter
+// ========================
+.filename-filter-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: 500px;
+}
+
+.filename-filter-input {
+  @include input-base($padding: 0.5rem 2.5rem 0.5rem 1rem, $radius: $radius-md);
+  font-size: 0.95rem;
+  width: 100%;
+
+  &:hover {
+    border-color: $color-primary;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $color-primary;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  }
+}
+
+.clear-filter-btn {
+  position: absolute;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  color: $color-text-muted;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.9rem;
+  transition: all $transition;
+  border-radius: $radius-sm;
+
+  &:hover {
+    color: $color-text;
+    background: $color-bg;
+  }
+}
+
+.clear-similar-btn {
+  @include button-base($padding: 0.35rem 0.75rem, $radius: $radius-md);
+  background: $color-error;
+  color: $color-white;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  margin-left: 0.5rem;
+
+  @include lift-hover($y: -1px, $shadow: 0 3px 6px rgba(220, 38, 38, 0.4));
+
+  &:hover {
+    background: $color-error-dark;
+  }
+}

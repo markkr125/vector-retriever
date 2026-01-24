@@ -1,0 +1,22 @@
+// ========================
+// ResultsList Component Styles
+// ========================
+// Main entry point - forwards all partials
+// Each partial uses variables/mixins via relative @use
+//
+// Structure:
+// - ResultsContainer: Main container, header, empty states, grid
+// - ClusterView: Visualization panel, plot, selection
+// - BrowseControls: Sort, filter, per-page controls
+// - ResultCard: Individual result cards, metadata, actions
+// - ResultTabs: Content tabs, overview, markdown display
+// - Pagination: Page navigation controls
+// - Badges: Status and metadata badges
+
+@forward 'ResultsContainer';
+@forward 'ClusterView';
+@forward 'BrowseControls';
+@forward 'ResultCard';
+@forward 'ResultTabs';
+@forward 'Pagination';
+@forward 'Badges';

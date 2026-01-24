@@ -1,0 +1,265 @@
+@use '../../base/variables' as *;
+@use '../../base/mixins' as *;
+
+// ========================
+// Result Card
+// ========================
+
+.result-card {
+  transition: all $transition-slow;
+  position: relative;
+
+  @include lift-hover($y: -2px, $shadow: $shadow-md);
+
+  &.source-document {
+    border: 2px solid #667eea;
+    background: linear-gradient(to bottom, rgba(102, 126, 234, 0.05), $color-white);
+  }
+
+  &.highlight {
+    animation: vr-highlight-pulse 0.6s ease-in-out;
+  }
+}
+
+.source-badge {
+  position: absolute;
+  top: -12px;
+  right: 1rem;
+  background: $gradient-brand;
+  color: $color-white;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  z-index: 1;
+}
+
+// ========================
+// Result Header
+// ========================
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid $color-border;
+
+  .result-rank {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: $color-primary;
+    min-width: 3rem;
+  }
+}
+
+// ========================
+// Score Display
+// ========================
+.result-score {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+
+  .score-bar {
+    flex: 1;
+    height: 8px;
+    background: $color-border;
+    border-radius: $radius-sm;
+    overflow: hidden;
+  }
+
+  .score-fill {
+    height: 100%;
+    background: linear-gradient(90deg, $color-primary, $color-secondary);
+    transition: width 0.6s ease-out;
+  }
+
+  .score-text {
+    font-weight: 600;
+    color: $color-text;
+    min-width: 4rem;
+    text-align: right;
+  }
+}
+
+// ========================
+// Result Metadata
+// ========================
+.result-metadata {
+  margin-bottom: 1rem;
+}
+
+.filename-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+
+  .result-filename {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: $color-text;
+    margin: 0;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    flex: 1;
+  }
+}
+
+.metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+
+  .meta-label {
+    color: $color-text-muted;
+    font-weight: 500;
+  }
+
+  .meta-value {
+    color: $color-text;
+  }
+}
+
+// ========================
+// Tags
+// ========================
+.tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+
+  .tag {
+    padding: 0.25rem 0.75rem;
+    background: $color-bg;
+    border: 1px solid $color-border;
+    border-radius: 16px;
+    font-size: 0.85rem;
+    color: $color-text-muted;
+  }
+}
+
+// ========================
+// Timestamps
+// ========================
+.timestamp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+  color: $color-text-muted;
+
+  .timestamp {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+
+    &.updated {
+      color: $color-info;
+      font-weight: 500;
+    }
+  }
+}
+
+// ========================
+// Document Type Badges
+// ========================
+.doc-type-badges {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+// ========================
+// Result Content
+// ========================
+.result-content {
+  padding: 1rem;
+  background: $color-bg;
+  border-radius: $radius-lg;
+  margin-bottom: 1rem;
+
+  p {
+    color: $color-text;
+    line-height: 1.6;
+    margin: 0;
+  }
+}
+
+// ========================
+// Result Actions
+// ========================
+.result-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+
+  .btn {
+    flex: 1;
+  }
+}
+
+.btn-bookmark {
+  @include button-base($padding: 0.3rem 0.6rem, $radius: $radius-md);
+  font-size: 1.5rem;
+  background: $color-white;
+  border: 2px solid $color-border;
+  flex: 0 0 auto !important;
+
+  &:hover {
+    border-color: #fbbf24;
+    background: $bg-warning-soft;
+    transform: scale(1.1);
+  }
+
+  &.bookmarked {
+    background: $bg-warning-soft;
+    border-color: #fbbf24;
+    color: $color-warning;
+  }
+}
+
+.btn-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: none;
+  }
+}
+
+.expand-btn {
+  width: 100%;
+}
+
+.full-content {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid $color-border;
+
+  h4 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: $color-text;
+  }
+}

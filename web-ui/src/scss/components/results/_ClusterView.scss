@@ -1,0 +1,269 @@
+@use '../../base/variables' as *;
+@use '../../base/mixins' as *;
+
+// ========================
+// Cluster Visualization Section
+// ========================
+
+.cluster-visualization-section {
+  margin: 0.75rem 0;
+}
+
+.btn-visualize-results {
+  @include button-base($padding: 0.75rem 1.25rem, $radius: $radius-lg);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: $gradient-brand;
+  color: $color-white;
+  font-size: 0.95rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+
+  @include lift-hover($shadow: 0 4px 12px rgba(59, 130, 246, 0.4));
+}
+
+// ========================
+// Cluster Panel
+// ========================
+.cluster-view-panel {
+  margin-top: -1rem;
+  margin-bottom: -1rem;
+  border: 2px solid $color-border;
+  border-radius: $radius-xl;
+  padding: 1.5rem;
+  background: $color-bg;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.cluster-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid $color-border;
+
+  h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: $color-text;
+  }
+}
+
+// ========================
+// Cluster Controls
+// ========================
+.cluster-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+
+  label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: $color-text-muted;
+    margin-right: 0.25rem;
+  }
+
+  select {
+    @include input-base($padding: 0.35rem 0.5rem, $radius: $radius-md);
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  button {
+    @include button-base($padding: 0.35rem 0.75rem, $radius: $radius-md);
+    background: $color-white;
+    font-size: 0.85rem;
+    font-weight: 600;
+
+    &:hover {
+      background: $color-bg;
+      border-color: $color-primary;
+      color: $color-primary;
+    }
+  }
+}
+
+.btn-clear-selection {
+  background: $bg-warning-soft !important;
+  border-color: $color-warning !important;
+  color: #92400e !important;
+
+  &:hover {
+    background: #fde68a !important;
+    border-color: $color-warning-hover !important;
+    color: #78350f !important;
+  }
+}
+
+// ========================
+// Plot Container
+// ========================
+.cluster-plot-container {
+  margin-top: 1rem;
+  height: 500px;
+  border-radius: $radius-lg;
+  overflow: hidden;
+}
+
+// ========================
+// Loading, Error & Empty States
+// ========================
+.cluster-loading,
+.cluster-error,
+.cluster-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  font-size: 1rem;
+  color: $color-text-muted;
+}
+
+.cluster-error {
+  color: $color-error;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cluster-empty {
+  flex-direction: column;
+  gap: 1rem;
+  background: $color-primary-lighter;
+  border: 2px dashed $color-primary;
+  border-radius: $radius-lg;
+  padding: 2rem;
+
+  p {
+    margin: 0;
+    font-size: 1rem;
+    color: $color-primary-dark;
+  }
+}
+
+// ========================
+// Filter & Info
+// ========================
+.cluster-filter-info {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: $color-primary-light;
+  border: 2px solid $color-primary;
+  border-radius: $radius-lg;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: $color-primary-dark;
+}
+
+.btn-clear-filter {
+  @include button-base($padding: 0.35rem 0.75rem, $radius: $radius-md);
+  background: $color-primary;
+  color: $color-white;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+
+  @include lift-hover($y: -1px, $shadow: 0 2px 6px rgba(59, 130, 246, 0.4));
+
+  &:hover {
+    background: $color-primary-dark;
+  }
+}
+
+.cluster-info {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: $color-bg;
+  border-radius: $radius-md;
+  font-size: 0.85rem;
+  color: $color-text-muted;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+// ========================
+// Selection Panel
+// ========================
+.cluster-selection-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: $color-primary-lighter;
+  border: 1px solid $color-primary;
+  border-radius: $radius-lg;
+
+  h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.95rem;
+    color: $color-text;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  button {
+    @include button-base($padding: 0.25rem 0.5rem, $radius: $radius-sm);
+    background: $color-primary;
+    color: $color-white;
+    font-size: 0.75rem;
+    font-weight: 600;
+
+    &:hover {
+      background: $color-primary-dark;
+    }
+  }
+}
+
+.selected-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+
+  @include scrollbars($size: 6px);
+}
+
+.selected-item {
+  padding: 0.75rem;
+  background: $color-white;
+  border-radius: $radius-md;
+  cursor: pointer;
+  transition: all $transition;
+
+  &:hover {
+    background: $color-primary-light;
+    transform: translateX(4px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .selected-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: $color-text;
+    margin-bottom: 0.25rem;
+  }
+
+  .selected-meta {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+}
+
+.selected-more {
+  padding: 0.5rem;
+  text-align: center;
+  color: $color-text-muted;
+  font-size: 0.85rem;
+  font-style: italic;
+}

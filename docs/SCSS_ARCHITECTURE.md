@@ -33,9 +33,17 @@ web-ui/src/scss/
     │   └── UploadProgressModal.scss
     ├── notifications/           # Toast & alerts
     │   └── ScanNotification.scss
-    ├── search/                  # Search & results
+    ├── results/                 # Results list (modular)
+    │   ├── ResultsList.scss     # Entry point (@import all partials)
+    │   ├── _ResultsContainer.scss
+    │   ├── _ClusterView.scss
+    │   ├── _BrowseControls.scss
+    │   ├── _ResultCard.scss
+    │   ├── _ResultTabs.scss
+    │   ├── _Pagination.scss
+    │   └── _Badges.scss
+    ├── search/                  # Search form & facets
     │   ├── FacetBar.scss
-    │   ├── ResultsList.scss
     │   └── SearchForm.scss
     ├── sidebar/                 # Sidebar components
     │   └── FacetsSidebar.scss
@@ -388,6 +396,30 @@ Shared keyframes in `_animations.scss` use the `vr-` prefix to avoid collisions:
   animation: vr-spin 1s linear infinite;
 }
 ```
+
+### 7. Never Use Deprecated Sass Features
+
+**CRITICAL:** Do not use deprecated Sass features:
+
+```scss
+// ❌ FORBIDDEN - @import is deprecated
+@import 'variables';
+@import 'mixins';
+
+// ✅ REQUIRED - Use @use with namespace
+@use '../../base/variables' as *;
+@use '../../base/mixins' as *;
+
+// ✅ REQUIRED - Use @forward to re-export partials
+@forward 'Partial';
+```
+
+**Why:** `@import` is deprecated in Dart Sass and will be removed in future versions. It also has scoping issues that `@use`/`@forward` solve.
+
+**Pattern for modular files:**
+- Partials (files starting with `_`) should include their own `@use` statements
+- Entry files use `@forward` to aggregate partials
+- Use relative paths in partials (e.g., `../../base/variables`)
 
 ## Adding New Styles
 

@@ -1,0 +1,62 @@
+@use '../../base/variables' as *;
+@use '../../base/mixins' as *;
+
+// ========================
+// Pagination
+// ========================
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.pagination-btn {
+  @include button-base($padding: 0.5rem 1rem, $radius: $radius-md);
+  min-width: 120px;
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.page-numbers {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.page-number-btn {
+  @include button-base($padding: 0.5rem, $radius: $radius-md);
+  min-width: 40px;
+  height: 40px;
+  border: 1px solid $color-border;
+  background: $color-white;
+  color: $color-text;
+  font-weight: 500;
+
+  &:hover:not(.ellipsis):not(.active) {
+    background: $color-bg;
+    border-color: $color-primary;
+  }
+
+  &.active {
+    background: $color-primary;
+    color: $color-white;
+    border-color: $color-primary;
+  }
+
+  &.ellipsis {
+    border: none;
+    background: transparent;
+    cursor: default;
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+}
