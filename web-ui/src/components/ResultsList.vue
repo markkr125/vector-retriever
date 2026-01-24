@@ -481,14 +481,15 @@
                 ℹ️ This description was generated during upload. Refresh is unavailable because the original image was not stored.
               </div>
 
-              <div v-if="result.payload.description" class="description-content" v-html="renderMarkdown(result.payload.description)"></div>
-              <div v-else-if="generatingDescription.has(result.id)" class="description-loading">
+              <!-- Show loading skeleton when generating (even if refreshing existing description) -->
+              <div v-if="generatingDescription.has(result.id)" class="description-loading">
                 <div class="skeleton-line"></div>
                 <div class="skeleton-line"></div>
                 <div class="skeleton-line short"></div>
                 <div class="skeleton-line"></div>
                 <div class="skeleton-line short"></div>
               </div>
+              <div v-else-if="result.payload.description" class="description-content" v-html="renderMarkdown(result.payload.description)"></div>
               <div v-else class="no-description">
                 <p>No description available. Click "Generate" to create one.</p>
               </div>

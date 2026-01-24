@@ -1,3 +1,6 @@
+// ========================
+// Document Cluster View
+// ========================
 .document-cluster-view {
   padding: 2rem;
   max-width: 1600px;
@@ -10,15 +13,18 @@
   align-items: center;
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
-  border-bottom: 2px solid #eee;
+  border-bottom: 2px solid $color-border;
+
+  h1 {
+    margin: 0;
+    font-size: 2rem;
+    color: $color-text;
+  }
 }
 
-.cluster-header h1 {
-  margin: 0;
-  font-size: 2rem;
-  color: #2c3e50;
-}
-
+// ========================
+// Controls
+// ========================
 .controls {
   display: flex;
   gap: 1rem;
@@ -29,81 +35,72 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-}
 
-.control-group label {
-  font-weight: 500;
-  color: #555;
+  label {
+    font-weight: 500;
+    color: $color-text-muted;
+  }
 }
 
 .control-select {
-  @include input-base(
-    $padding: 0.5rem 1rem,
-    $radius: $radius-sm,
-    $font-size: 0.9rem,
-    $border-color: #ddd,
-    $background: white
-  );
+  @include input-base($padding: 0.5rem 1rem, $radius: $radius-sm);
+  font-size: 0.9rem;
   cursor: pointer;
 }
 
 .control-input {
-  @include input-base(
-    $padding: 0.5rem 1rem,
-    $radius: $radius-sm,
-    $font-size: 0.9rem,
-    $border-color: #ddd,
-    $background: white
-  );
+  @include input-base($padding: 0.5rem 1rem, $radius: $radius-sm);
+  font-size: 0.9rem;
   width: 100px;
   text-align: center;
 }
 
+// ========================
+// Buttons
+// ========================
 .btn {
-  @include button-base(
-    $padding: 0.6rem 1.2rem,
-    $radius: $radius-sm,
-    $font-size: 0.9rem,
-    $font-weight: 500,
-    $border: none,
-    $transition: all 0.2s
-  );
+  @include button-base($padding: 0.6rem 1.2rem, $radius: $radius-sm);
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .btn-refresh {
-  background: #3498db;
-  color: white;
-}
+  background: $color-info;
+  color: $color-white;
 
-.btn-refresh:hover:not(:disabled) {
-  background: #2980b9;
-}
+  &:hover:not(:disabled) {
+    background: $color-info-hover;
+  }
 
-.btn-refresh:disabled {
-  background: #bdc3c7;
-  cursor: not-allowed;
+  &:disabled {
+    background: $color-border;
+    cursor: not-allowed;
+  }
 }
 
 .btn-retry {
-  background: #e74c3c;
-  color: white;
-}
+  background: $color-error;
+  color: $color-white;
 
-.btn-retry:hover {
-  background: #c0392b;
+  &:hover {
+    background: $color-error-dark;
+  }
 }
 
 .btn-small {
   padding: 0.4rem 0.8rem;
   font-size: 0.85rem;
   background: #95a5a6;
-  color: white;
+  color: $color-white;
+
+  &:hover {
+    background: #7f8c8d;
+  }
 }
 
-.btn-small:hover {
-  background: #7f8c8d;
-}
-
+// ========================
+// Loading & Error States
+// ========================
 .loading-container,
 .error-container {
   text-align: center;
@@ -113,25 +110,28 @@
 .spinner {
   width: 50px;
   height: 50px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #3498db;
+  border: 4px solid $color-bg;
+  border-top: 4px solid $color-info;
   border-radius: 50%;
   animation: vr-spin 1s linear infinite;
   margin: 0 auto 1rem;
 }
 
 .loading-hint {
-  color: #7f8c8d;
+  color: $color-text-muted;
   font-size: 0.9rem;
   margin-top: 0.5rem;
 }
 
 .error-message {
-  color: #e74c3c;
+  color: $color-error;
   font-size: 1.1rem;
   margin-bottom: 1rem;
 }
 
+// ========================
+// Visualization Container
+// ========================
 .visualization-container {
   display: flex;
   flex-direction: column;
@@ -142,8 +142,8 @@
   display: flex;
   gap: 2rem;
   padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 8px;
+  background: $color-bg;
+  border-radius: $radius-lg;
   font-size: 0.9rem;
 }
 
@@ -151,21 +151,24 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #555;
+  color: $color-text-muted;
 }
 
 .plot-wrapper {
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+  background: $color-white;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
   padding: 1rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: $shadow-sm;
 }
 
+// ========================
+// Selection Panel
+// ========================
 .selection-panel {
-  background: #f8f9fa;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+  background: $color-bg;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
   padding: 1rem;
   margin-top: 1rem;
 }
@@ -175,12 +178,12 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1rem;
-}
 
-.selection-header h3 {
-  margin: 0;
-  font-size: 1.1rem;
-  color: #2c3e50;
+  h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: $color-text;
+  }
 }
 
 .selected-list {
@@ -189,25 +192,27 @@
   gap: 0.5rem;
   max-height: 300px;
   overflow-y: auto;
+
+  @include scrollbars($size: 6px);
 }
 
 .selected-item {
   padding: 0.75rem;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  background: $color-white;
+  border: 1px solid $color-border;
+  border-radius: $radius-sm;
   cursor: pointer;
-  transition: all 0.2s;
-}
+  transition: all $transition;
 
-.selected-item:hover {
-  border-color: #3498db;
-  box-shadow: 0 2px 4px rgba(52, 152, 219, 0.2);
+  &:hover {
+    border-color: $color-info;
+    box-shadow: 0 2px 4px rgba($color-info, 0.2);
+  }
 }
 
 .selected-title {
   font-weight: 500;
-  color: #2c3e50;
+  color: $color-text;
   margin-bottom: 0.5rem;
 }
 
@@ -217,12 +222,15 @@
   flex-wrap: wrap;
 }
 
+// ========================
+// Badges
+// ========================
 .badge {
   padding: 0.2rem 0.6rem;
   border-radius: 12px;
   font-size: 0.75rem;
   font-weight: 500;
-  color: white;
+  color: $color-white;
 }
 
 .badge-location {
@@ -231,56 +239,45 @@
 
 .badge-pii {
   font-weight: 600;
-}
 
-.badge-pii.risk-none {
-  background: #2ecc71;
-}
-
-.badge-pii.risk-low {
-  background: #f39c12;
-}
-
-.badge-pii.risk-medium {
-  background: #e67e22;
-}
-
-.badge-pii.risk-high {
-  background: #e74c3c;
-}
-
-.badge-pii.risk-critical {
-  background: #8e44ad;
+  &.risk-none { background: $color-success-accent; }
+  &.risk-low { background: $color-warning; }
+  &.risk-medium { background: $color-warning-hover; }
+  &.risk-high { background: $color-danger-accent; }
+  &.risk-critical { background: $color-critical-accent; }
 }
 
 .selected-more {
   padding: 0.5rem;
   text-align: center;
-  color: #7f8c8d;
+  color: $color-text-muted;
   font-style: italic;
 }
 
+// ========================
+// Legend
+// ========================
 .legend-box {
-  background: #e8f4f8;
-  border: 1px solid #3498db;
-  border-radius: 8px;
+  background: $bg-info-soft;
+  border: 1px solid $color-info;
+  border-radius: $radius-lg;
   padding: 1rem;
   margin-top: 1.5rem;
-}
 
-.legend-box h4 {
-  margin: 0 0 0.75rem 0;
-  color: #2c3e50;
-  font-size: 1rem;
-}
+  h4 {
+    margin: 0 0 0.75rem 0;
+    color: $color-text;
+    font-size: 1rem;
+  }
 
-.legend-box ul {
-  margin: 0;
-  padding-left: 1.5rem;
-  color: #555;
-}
+  ul {
+    margin: 0;
+    padding-left: 1.5rem;
+    color: $color-text-muted;
+  }
 
-.legend-box li {
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
+  li {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+  }
 }

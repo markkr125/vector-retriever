@@ -5,11 +5,24 @@
   transform: translateX(-50%);
   width: 90%;
   max-width: 600px;
-  background: white;
-  border-radius: 12px;
+  background: $color-white;
+  border-radius: $radius-xl;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-  z-index: 9999;
+  z-index: $z-toast;
   overflow: hidden;
+
+  // Notification variants
+  &.notification-warning {
+    border-top: 4px solid $color-warning;
+  }
+
+  &.notification-success {
+    border-top: 4px solid $color-success-accent;
+  }
+
+  &.notification-error {
+    border-top: 4px solid $color-error-accent;
+  }
 }
 
 .notification-content {
@@ -21,85 +34,68 @@
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 1rem;
-}
 
-.notification-icon {
-  font-size: 2rem;
-}
+  .notification-icon {
+    font-size: 2rem;
+  }
 
-.notification-title {
-  flex: 1;
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
+  .notification-title {
+    flex: 1;
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: $color-text;
+  }
 
-.close-btn {
-  @include close-button($size: 30px, $font-size: 2rem, $radius: $radius-sm);
+  .close-btn {
+    @include close-button($size: 30px, $font-size: 2rem, $radius: $radius-sm);
+  }
 }
 
 .notification-message {
   margin: 0 0 1rem 0;
-  color: var(--text-primary);
+  color: $color-text;
   font-size: 1rem;
 }
 
 .pii-types-list {
-  background: var(--background);
+  background: $color-bg;
   padding: 1rem;
-  border-radius: 8px;
-}
+  border-radius: $radius-lg;
 
-.pii-types-list strong {
-  display: block;
-  margin-bottom: 0.75rem;
-  color: var(--text-primary);
+  strong {
+    display: block;
+    margin-bottom: 0.75rem;
+    color: $color-text;
+  }
 }
 
 .pii-badges {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+
+  .pii-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.4rem 0.75rem;
+    background: $color-white;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
+    font-size: 0.9rem;
+    color: $color-text;
+    font-weight: 500;
+  }
 }
 
-.pii-type-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.4rem 0.75rem;
-  background: white;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  font-size: 0.9rem;
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-/* Notification variants */
-.notification-warning {
-  border-top: 4px solid $color-warning;
-}
-
-.notification-success {
-  border-top: 4px solid $color-success-accent;
-}
-
-.notification-error {
-  border-top: 4px solid $color-error-accent;
-}
-
-/* Animations */
+// Animations
 .slide-down-enter-active,
 .slide-down-leave-active {
-  transition: all 0.3s ease;
+  transition: all $transition-slow ease;
 }
 
-.slide-down-enter-from {
-  opacity: 0;
-  transform: translate(-50%, -20px);
-}
-
+.slide-down-enter-from,
 .slide-down-leave-to {
   opacity: 0;
   transform: translate(-50%, -20px);

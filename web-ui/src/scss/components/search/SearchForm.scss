@@ -1,3 +1,6 @@
+// ========================
+// Search Form
+// ========================
 .search-form {
   position: sticky;
   top: 6rem;
@@ -7,7 +10,7 @@
   font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: 1.5rem;
-  color: var(--text-primary);
+  color: $color-text;
 }
 
 .form-group {
@@ -18,43 +21,52 @@
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 500;
-  color: var(--text-primary);
+  color: $color-text;
   font-size: 0.95rem;
 }
 
 .label-hint {
-  color: var(--text-secondary);
+  color: $color-text-muted;
   font-weight: 400;
   font-size: 0.85rem;
 }
 
+// ========================
+// Slider Input
+// ========================
 .slider {
   width: 100%;
   height: 6px;
   border-radius: 3px;
-  background: var(--border-color);
+  background: $color-border;
   outline: none;
   -webkit-appearance: none;
   appearance: none;
-}
 
-.slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--primary-color);
-  cursor: pointer;
-}
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: $color-primary;
+    cursor: pointer;
+    transition: transform $transition, box-shadow $transition;
 
-.slider::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--primary-color);
-  cursor: pointer;
-  border: none;
+    &:hover {
+      transform: scale(1.1);
+      box-shadow: 0 2px 8px rgba($color-primary, 0.4);
+    }
+  }
+
+  &::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: $color-primary;
+    cursor: pointer;
+    border: none;
+  }
 }
 
 .slider-labels {
@@ -62,9 +74,12 @@
   justify-content: space-between;
   margin-top: 0.5rem;
   font-size: 0.85rem;
-  color: var(--text-secondary);
+  color: $color-text-muted;
 }
 
+// ========================
+// Geo & Row Layouts
+// ========================
 .geo-inputs {
   display: grid;
   gap: 1rem;
@@ -76,10 +91,13 @@
   gap: 1rem;
 }
 
+// ========================
+// Filters Section
+// ========================
 .filters-section {
   margin: 1.5rem 0;
   padding-top: 1.5rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid $color-border;
 }
 
 .filters-content {
@@ -88,17 +106,23 @@
 
 .hint {
   text-align: center;
-  color: var(--text-secondary);
+  color: $color-text-muted;
   font-size: 0.85rem;
   margin-top: 0.75rem;
 }
+
+// ========================
+// Action Buttons
+// ========================
 .action-buttons {
   display: flex;
   gap: 0.75rem;
   margin-bottom: 0.5rem;
 }
 
-/* File upload styling */
+// ========================
+// File Upload
+// ========================
 .file-upload-area {
   margin-top: 0.5rem;
 }
@@ -113,16 +137,16 @@
   align-items: center;
   gap: 0.75rem;
   padding: 2rem;
-  border: 2px dashed var(--border-color);
-  border-radius: 8px;
-  background: var(--bg-secondary);
+  border: 2px dashed $color-border;
+  border-radius: $radius-lg;
+  background: $color-bg;
   cursor: pointer;
-  transition: all 0.3s ease;
-}
+  transition: all $transition;
 
-.file-upload-label:hover {
-  border-color: var(--primary-color);
-  background: var(--bg-color);
+  &:hover {
+    border-color: $color-primary;
+    background: $color-surface;
+  }
 }
 
 .upload-icon {
@@ -130,36 +154,39 @@
 }
 
 .upload-text {
-  color: var(--text-secondary);
+  color: $color-text-muted;
   font-size: 0.95rem;
-}
 
-.upload-text.selected {
-  color: var(--primary-color);
-  font-weight: 600;
+  &.selected {
+    color: $color-primary;
+    font-weight: 600;
+  }
 }
 
 .upload-hint {
-  color: var(--text-muted);
+  color: $color-text-muted;
   font-size: 0.8rem;
 }
 
+// ========================
+// Surprise Me Button
+// ========================
 .btn-surprise {
+  @include button-base($radius: $radius-md);
   width: 100%;
-  background: var(--bg-secondary);
-  color: var(--text-color);
-  border: 1px solid var(--border-color);
+  background: $color-bg;
+  color: $color-text;
+  border: 1px solid $color-border;
   font-weight: 500;
-  transition: all 0.2s ease;
-}
 
-.btn-surprise:hover:not(:disabled) {
-  background: var(--bg-color);
-  border-color: var(--primary-color);
-  color: var(--primary-color);
-}
+  &:hover:not(:disabled) {
+    background: $color-surface;
+    border-color: $color-primary;
+    color: $color-primary;
+  }
 
-.btn-surprise:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 }

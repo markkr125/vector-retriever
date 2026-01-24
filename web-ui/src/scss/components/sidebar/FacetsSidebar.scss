@@ -1,3 +1,6 @@
+// ========================
+// Facets Sidebar
+// ========================
 .facets-sidebar {
   margin-top: 1.5rem;
 }
@@ -6,36 +9,36 @@
   font-size: 1.25rem;
   font-weight: 700;
   margin-bottom: 1.5rem;
-  color: var(--text-primary);
+  color: $color-text;
 }
 
+// ========================
+// Facet Groups
+// ========================
 .facet-group {
   margin-bottom: 1rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid $color-border;
   padding-bottom: 1rem;
-}
 
-.facet-group:last-child {
-  border-bottom: none;
+  &:last-child {
+    border-bottom: none;
+  }
 }
 
 .facet-header {
+  @include button-base($padding: 0.75rem, $radius: $radius-md);
   width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem;
   background: none;
   border: none;
-  cursor: pointer;
   font-weight: 600;
-  color: var(--text-primary);
-  transition: background 0.2s;
-  border-radius: 6px;
-}
+  color: $color-text;
 
-.facet-header:hover {
-  background: var(--background);
+  &:hover {
+    background: $color-bg;
+  }
 }
 
 .facet-list {
@@ -43,56 +46,57 @@
 }
 
 .facet-item {
+  @include button-base($padding: 0.5rem 1rem, $radius: $radius-md);
   width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 1rem;
   background: none;
   border: none;
-  cursor: pointer;
   text-align: left;
-  transition: all 0.2s;
-  border-radius: 6px;
-}
 
-.facet-item:hover {
-  background: var(--background);
-  color: var(--primary-color);
+  &:hover {
+    background: $color-bg;
+    color: $color-primary;
+
+    .facet-count {
+      background: $color-primary;
+      color: $color-white;
+    }
+  }
 }
 
 .facet-name {
   flex: 1;
   font-size: 0.9rem;
-  color: var(--text-primary);
+  color: $color-text;
 }
 
 .facet-count {
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--background);
+  color: $color-text-muted;
+  background: $color-bg;
   padding: 0.25rem 0.5rem;
   border-radius: 12px;
   min-width: 2rem;
   text-align: center;
+
+  &.danger {
+    background: $bg-error-soft;
+    color: $color-critical-accent;
+    font-weight: 700;
+  }
 }
 
-.facet-item:hover .facet-count {
-  background: var(--primary-color);
-  color: white;
-}
-
-.facet-count.danger {
-  background: #ffebee;
-  color: $color-critical-accent;
-  font-weight: 700;
-}
-
-/* PII Facet Styles */
-.pii-facet .facet-header.has-warning {
-  background: linear-gradient(135deg, rgba($color-warning, 0.1), rgba($color-danger-accent, 0.1));
-  border-left: 3px solid $color-danger-accent;
+// ========================
+// PII Facet Styles
+// ========================
+.pii-facet {
+  .facet-header.has-warning {
+    background: linear-gradient(135deg, rgba($color-warning, 0.1), rgba($color-danger-accent, 0.1));
+    border-left: 3px solid $color-danger-accent;
+  }
 }
 
 .pii-any-item {
@@ -108,48 +112,44 @@
   padding: 0.75rem 1rem;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--background);
-  border-radius: 4px;
+  color: $color-text-muted;
+  background: $color-bg;
+  border-radius: $radius-sm;
   margin: 0.5rem 0;
 }
 
-.risk-item.risk-low {
-  border-left: 3px solid $color-success-accent;
+// ========================
+// Risk Level Items
+// ========================
+.risk-item {
+  &.risk-low { border-left: 3px solid $color-success-accent; }
+  &.risk-medium { border-left: 3px solid $color-warning; }
+  &.risk-high { border-left: 3px solid $color-danger-accent; }
+
+  &.risk-critical {
+    border-left: 3px solid $color-critical-accent;
+    background: rgba($color-critical-accent, 0.05);
+  }
 }
 
-.risk-item.risk-medium {
-  border-left: 3px solid $color-warning;
-}
-
-.risk-item.risk-high {
-  border-left: 3px solid $color-danger-accent;
-}
-
-.risk-item.risk-critical {
-  border-left: 3px solid $color-critical-accent;
-  background: rgba(211, 47, 47, 0.05);
-}
-
+// ========================
+// Bulk Scan Section
+// ========================
 .bulk-scan-section {
   padding: 1rem;
 }
 
 .btn-bulk-scan {
+  @include button-base($padding: 0.75rem 1rem, $radius: $radius-lg);
   width: 100%;
-  padding: 0.75rem 1rem;
-  background: var(--primary);
-  color: white;
-  border: none;
-  border-radius: 8px;
+  background: $color-primary;
+  color: $color-white;
   font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
   font-size: 0.9rem;
 
-  @include lift-hover($shadow: 0 4px 12px rgba(66, 133, 244, 0.3));
-}
+  @include lift-hover($shadow: 0 4px 12px rgba($color-primary, 0.3));
 
-.btn-bulk-scan:hover {
-  background: var(--primary-dark);
+  &:hover {
+    background: $color-primary-dark;
+  }
 }

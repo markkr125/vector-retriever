@@ -37,6 +37,20 @@ $color-critical-accent: #d32f2f;
 $color-critical-accent-hover: #c62828;
 $color-error-accent: var(--error, #f44336);
 
+// Extended primary palette (compile-time)
+$color-primary-light: #dbeafe;
+$color-primary-lighter: #eff6ff;
+$color-primary-dark: #1e40af;
+
+// Extended error/red palette (compile-time)
+$color-error-light: #fee2e2;
+$color-error-dark: #b91c1c;
+
+// Info blues (compile-time)
+$color-info: #3498db;
+$color-info-hover: #2980b9;
+$color-info-dark: #1e40af;
+
 $bg-success-soft: #f0fdf4;
 $text-success: #059669;
 $bg-warning-soft: #fff7ed;

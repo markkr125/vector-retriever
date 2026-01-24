@@ -1,3 +1,6 @@
+// ========================
+// Collection Selector
+// ========================
 .collection-selector {
   position: relative;
   z-index: $z-dropdown;
@@ -7,28 +10,31 @@
   position: relative;
 }
 
+// ========================
+// Main Button
+// ========================
 .collection-button {
+  @include button-base($padding: 10px 16px, $radius: $radius-md);
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px;
-  background: #3498db;
+  background: $color-info;
   color: $color-white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
   font-size: 15px;
   font-weight: 500;
-  transition: background-color 0.2s;
-}
 
-.collection-button:hover:not(:disabled) {
-  background: #2980b9;
-}
+  &:hover:not(:disabled) {
+    background: $color-info-hover;
+  }
 
-.collection-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &:hover .dropdown-arrow {
+    transform: translateY(2px);
+  }
 }
 
 .collection-icon {
@@ -47,13 +53,12 @@
 .dropdown-arrow {
   margin-left: 4px;
   font-size: 12px;
-  transition: transform 0.2s;
+  transition: transform $transition;
 }
 
-.collection-button:hover .dropdown-arrow {
-  transform: translateY(2px);
-}
-
+// ========================
+// Dropdown Menu
+// ========================
 .dropdown-menu {
   position: absolute;
   top: 100%;
@@ -70,7 +75,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid $color-border;
   font-weight: 600;
   color: $color-text;
 }
@@ -86,6 +91,9 @@
   @include scrollbars();
 }
 
+// ========================
+// Collection Options
+// ========================
 .collection-option {
   width: 100%;
   display: flex;
@@ -94,18 +102,18 @@
   padding: 12px 16px;
   background: $color-surface;
   border: none;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid rgba($color-border, 0.5);
   cursor: pointer;
   text-align: left;
-  transition: background-color 0.2s;
-}
+  transition: background-color $transition;
 
-.collection-option:hover {
-  background: $color-bg;
-}
+  &:hover {
+    background: $color-bg;
+  }
 
-.collection-option.active {
-  background: $bg-info-soft;
+  &.active {
+    background: $bg-info-soft;
+  }
 }
 
 .option-icon {
@@ -124,39 +132,41 @@
 }
 
 .checkmark {
-  color: #27ae60;
+  color: $color-success-accent;
   font-weight: bold;
   font-size: 18px;
 }
 
+// ========================
+// Dropdown Footer
+// ========================
 .dropdown-footer {
   padding: 12px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid $color-border;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
 .action-button {
+  @include button-base($padding: 10px 16px, $radius: $radius-md);
   width: 100%;
-  padding: 10px 16px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  transition: background-color 0.2s;
   text-align: left;
+
+  &.create {
+    @include accent-solid-button($bg: $color-secondary, $bg-hover: $color-secondary-hover, $lift: 0);
+  }
+
+  &.manage {
+    @include accent-solid-button($bg: #95a5a6, $bg-hover: #7f8c8d, $lift: 0);
+  }
 }
 
-.action-button.create {
-  @include accent-solid-button($bg: $color-secondary, $bg-hover: $color-secondary-hover, $lift: 0);
-}
-
-.action-button.manage {
-  @include accent-solid-button($bg: #95a5a6, $bg-hover: #7f8c8d, $lift: 0);
-}
-
+// ========================
+// Backdrop
+// ========================
 .backdrop {
   position: fixed;
   top: 0;

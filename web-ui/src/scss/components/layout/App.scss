@@ -1,8 +1,11 @@
+// ========================
+// Header
+// ========================
 .header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: $gradient-brand;
+  color: $color-white;
   padding: 2rem 0;
-  box-shadow: var(--shadow-lg);
+  box-shadow: $shadow-lg;
 }
 
 .header-content {
@@ -32,9 +35,9 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba($color-white, 0.1);
   padding: 0.25rem;
-  border-radius: 8px;
+  border-radius: $radius-lg;
 }
 
 .btn-compact {
@@ -75,40 +78,51 @@
   gap: 0.5rem;
 }
 
+// ========================
+// Add Document Button
+// ========================
 .btn-add {
-  background: var(--secondary-color);
-  color: white;
+  background: $color-secondary;
+  color: $color-white;
   white-space: nowrap;
+
+  &:hover {
+    background: $color-secondary-hover;
+    box-shadow: $shadow-md;
+  }
+
+  &.uploading {
+    background: linear-gradient(90deg, $color-warning, $color-warning-hover);
+    animation: vr-pulse 2s ease-in-out infinite;
+
+    &:hover {
+      background: linear-gradient(90deg, $color-warning-hover, #e65100);
+    }
+  }
 }
 
-.btn-add:hover {
-  background: #0d9668;
-  box-shadow: var(--shadow-md);
+// ========================
+// Secondary Button States
+// ========================
+.btn-secondary {
+  &.active {
+    background: $color-info-hover;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba($color-info, 0.3);
+
+    &:hover {
+      background: $color-info;
+    }
+  }
+
+  &:hover {
+    background: rgba($color-info-hover, 0.6);
+  }
 }
 
-.btn-add.uploading {
-  background: linear-gradient(90deg, $color-warning, $color-warning-hover);
-  animation: vr-pulse 2s ease-in-out infinite;
-}
-
-.btn-add.uploading:hover {
-  background: linear-gradient(90deg, $color-warning-hover, #e65100);
-}
-
-.btn-secondary.active {
-  background: #2980b9;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
-}
-
-.btn-secondary.active:hover {
-  background: #3498db;
-}
-
-.btn-secondary:hover {
-  background: rgba(41, 128, 185, 0.6);
-}
-
+// ========================
+// Main Content
+// ========================
 .main {
   padding: 2rem 0;
   min-height: calc(100vh - 300px);
@@ -118,24 +132,27 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 2rem;
-}
 
-@media (min-width: 1024px) {
-  .layout {
+  @media (min-width: 1024px) {
     grid-template-columns: 400px 1fr;
   }
 }
 
+// ========================
+// Footer
+// ========================
 .footer {
-  background: var(--surface);
-  border-top: 1px solid var(--border-color);
+  background: $color-surface;
+  border-top: 1px solid $color-border;
   padding: 2rem 0;
   margin-top: 4rem;
   text-align: center;
-  color: var(--text-secondary);
+  color: $color-text-muted;
 }
 
-/* Browse View Styles */
+// ========================
+// Browse View
+// ========================
 .browse-view {
   max-width: 1200px;
   margin: 0 auto;
@@ -149,42 +166,39 @@
   gap: 1.5rem;
   margin-bottom: 2rem;
   padding: 1.5rem;
-  background: var(--surface);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
+  background: $color-surface;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-sm;
 
-.browse-header h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--text-primary);
+  h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: $color-text;
+  }
 }
 
 .browse-controls {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
-}
 
-.browse-controls label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-}
+  label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: $color-text-muted;
+  }
 
-.browse-controls select {
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius);
-  background: white;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
+  select {
+    @include input-base($padding: 0.5rem, $radius: $radius-md);
+    font-size: 0.9rem;
+    cursor: pointer;
 
-.browse-controls select:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    &:focus {
+      outline: none;
+      border-color: $color-primary;
+      box-shadow: 0 0 0 3px rgba($color-primary, 0.1);
+    }
+  }
 }
