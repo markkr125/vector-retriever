@@ -400,5 +400,5 @@ docker stats
 
 **See also:**
 - [Main README](../README.md) - Project overview
-- [docker/README.md](../docker/README.md) - Docker file structure
+- [Docker Deployment Guide](DOCKER.md) - Docker file structure and configuration
 - [WEBUI_SETUP.md](WEBUI_SETUP.md) - Web UI configuration

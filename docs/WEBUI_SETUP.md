@@ -110,7 +110,7 @@ The API container includes headless LibreOffice for legacy Office file conversio
 docker compose -f docker/docker-compose.yml down
 ```
 
-See [docker/README.md](../docker/README.md) for detailed Docker documentation.
+See [Docker Deployment Guide](DOCKER.md) for detailed Docker documentation.
 
 ## Detailed Setup
 

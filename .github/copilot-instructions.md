@@ -37,7 +37,6 @@ Vue.js Web UI (port 5173) ←→ Express API (port 3001) ←→ Qdrant DB (port 
 ```
 docker/
 ├── start.sh                     # Auto-detect GPU and start (recommended)
-├── README.md                    # Comprehensive Docker documentation
 ├── docker-compose.yml           # NVIDIA GPU (requires nvidia-container-toolkit)
 ├── docker-compose.vulkan.yml    # AMD/Intel GPU via Vulkan
 ├── docker-compose.cpu.yml       # Pure CPU (no GPU acceleration)
@@ -52,6 +51,8 @@ docker/
     ├── Dockerfile               # Vue.js production build + nginx
     └── nginx.conf               # Nginx configuration with API proxy
 ```
+
+**Full Docker documentation:** See `docs/DOCKER.md` for deployment guide, GPU setup, using external services, and troubleshooting.
 
 **Key Files:**
 - `index.js` - CLI tool for embedding & search (`npm run embed`, `npm run search`)

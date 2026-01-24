@@ -25,7 +25,7 @@ See [Docker Management Guide](DOCKER_MANAGEMENT.md) for complete Docker document
 - Volume backups and data management
 - Troubleshooting
 
-Also see [docker/README.md](../docker/README.md) for Docker file structure.
+Also see [Docker Deployment Guide](DOCKER.md) for Docker deployment and configuration.
 
 ## 📚 Documentation Files
 

@@ -30,6 +30,7 @@ General purpose vector database application showcasing **Qdrant's powerful featu
 
 - **[Quick Reference](docs/QUICK_REFERENCE.md)** - Fast command reference and key features
 - **[Complete Summary](docs/SUMMARY.md)** - Comprehensive project overview
+- **[Docker Deployment](docs/DOCKER.md)** - GPU setup, external services, troubleshooting
 - **[Cloud Import Guide](docs/CLOUD_IMPORT.md)** - Import from S3/Google Drive with advanced filtering
 - **[Hybrid Search Implementation](docs/HYBRID_SEARCH_IMPLEMENTATION.md)** - Technical guide to weighted fusion, score normalization, and deep pagination
 - **[Mixed Dataset Guide](docs/MIXED_DATASET.md)** - Handling structured + unstructured documents
@@ -261,7 +262,7 @@ docker compose -f docker/docker-compose.cpu.yml up -d     # No GPU (CPU only)
 ./docker/start.sh pull-status  # Check download progress
 ```
 
-See [docker/README.md](docker/README.md) for detailed Docker documentation, GPU setup, and troubleshooting.
+See [Docker Deployment Guide](docs/DOCKER.md) for detailed Docker documentation, GPU setup, and troubleshooting.
 
 ## 🌐 Web UI
 
