@@ -76,6 +76,9 @@ jobs:
           # Build only what we run in this workflow
           docker compose -f docker/docker-compose.smoke.yml build api
 
+          # Also build Ollama image to catch Dockerfile regressions (no container run)
+          docker compose -f docker/docker-compose.cpu.yml build ollama
+
       - name: Start Qdrant + API (API uses mock Ollama)
         env:
           EMBEDDING_MODEL: mock-embed
