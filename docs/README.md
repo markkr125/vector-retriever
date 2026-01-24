@@ -71,6 +71,18 @@ Also see [Docker Deployment Guide](DOCKER.md) for Docker deployment and configur
 
 ---
 
+### [SCSS Architecture](SCSS_ARCHITECTURE.md)
+**Complete reference for the SCSS styling system**
+- Directory structure and file organization
+- Variable and mixin reference (colors, radii, shadows, gradients)
+- Coding conventions (nesting, mixins, section comments)
+- Animation keyframes (`vr-*` prefix for scoped styles)
+- Quick examples and anti-patterns
+
+**Best for:** Writing new SCSS that follows project conventions.
+
+---
+
 ### [SCSS Migration Workplan](SCSS_MIGRATION.md)
 **How the Web UI styling is organized (SCSS) and how to repeat the migration**
 - Folder structure (`scss/base`, `scss/components`, `scss/main.scss`)

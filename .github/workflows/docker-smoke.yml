@@ -11,16 +11,6 @@ on:
       - 'routes/**'
       - 'services/**'
       - '.github/workflows/docker-smoke.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'docker/**'
-      - 'scripts/mock-ollama-server.js'
-      - '.env.example'
-      - 'server.js'
-      - 'routes/**'
-      - 'services/**'
-      - '.github/workflows/docker-smoke.yml'
 
 jobs:
   validate:

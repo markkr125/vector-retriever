@@ -199,12 +199,32 @@ Entry behavior is unchanged: `npm run server` runs `server.js`.
 ### Vue Component Styling (SCSS)
 **CRITICAL:** All Vue components MUST keep styles in external files (no inline `<style>` blocks).
 
+**Full documentation:** See `docs/SCSS_ARCHITECTURE.md` for complete variable/mixin reference.
+
+**Directory Structure:**
+```
+web-ui/src/scss/
+├── main.scss                    # Entry point
+├── base/                        # Shared tokens & utilities
+│   ├── _variables.scss          # Design tokens (auto-injected)
+│   ├── _mixins.scss             # Reusable patterns (auto-injected)
+│   ├── _globals.scss            # CSS custom properties (:root)
+│   └── _animations.scss         # Shared keyframes (vr-* prefix)
+└── components/                  # Component-specific styles
+    ├── collections/             # CollectionSelector.scss
+    ├── layout/                  # App.scss
+    ├── modals/                  # UploadModal.scss, PIIDetailsModal.scss, etc.
+    ├── notifications/           # ScanNotification.scss
+    ├── search/                  # SearchForm.scss, ResultsList.scss, FacetBar.scss
+    ├── sidebar/                 # FacetsSidebar.scss
+    └── visualization/           # DocumentClusterView.scss
+```
+
 **Rules for component creation/modification:**
-1. **Component SCSS location**: `web-ui/src/scss/components/<domain>/ComponentName.scss` (organized by domain like `search/`, `modals/`, `sidebar/`, etc.)
+1. **Component SCSS location**: `web-ui/src/scss/components/<domain>/ComponentName.scss`
 2. **Component reference**: Use external SCSS via `<style scoped lang="scss" src="@/scss/components/<domain>/ComponentName.scss"></style>`
-3. **Global styles**: Live under `web-ui/src/scss/base/` and are loaded via `web-ui/src/scss/main.scss` (imported by `web-ui/src/main.js`).
-4. **Shared patterns**: Prefer extracting repeated patterns into `web-ui/src/scss/base/_mixins.scss` and shared tokens into `web-ui/src/scss/base/_variables.scss`.
-  - These are auto-injected into every SCSS file via Vite `css.preprocessorOptions.scss.additionalData`.
+3. **Global styles**: Live under `web-ui/src/scss/base/` and are loaded via `web-ui/src/scss/main.scss`
+4. **Auto-injection**: Variables and mixins are auto-injected via Vite - no explicit imports needed
 
 **Example Vue component structure:**
 ```vue
@@ -216,21 +236,91 @@ Entry behavior is unchanged: `npm run server` runs `server.js`.
 // Component logic
 </script>
 
-<style scoped lang="scss" src="@/scss/components/<domain>/ComponentName.scss"></style>
-
-<!-- Example with domain folder -->
 <style scoped lang="scss" src="@/scss/components/modals/UploadModal.scss"></style>
 ```
 
-**Notes:**
-- The project still uses CSS Custom Properties (CSS variables) in `:root` (see `web-ui/src/scss/base/_globals.scss`) for runtime theming.
-- Use SCSS primarily for file organization, partials, and reuse (mixins/functions) rather than replacing runtime theme tokens.
-- For repeated alert/status boxes (info/success/warning/error), prefer `@include status-banner(...)` from `web-ui/src/scss/base/_mixins.scss`.
-- For CSS animations/keyframes, prefer shared `vr-*` keyframes in `web-ui/src/scss/base/_animations.scss` (avoids global keyframe name collisions with Vue scoped styles).
-- For repeated “hover lift” interactions (translateY + shadow), prefer `@include lift-hover(...)` from `web-ui/src/scss/base/_mixins.scss`.
-- For repeated button base styling (padding/radius/font/cursor/transition), prefer `@include button-base(...)` from `web-ui/src/scss/base/_mixins.scss`.
-- For repeated form control styling (padding/border/radius/font/background), prefer `@include input-base(...)` from `web-ui/src/scss/base/_mixins.scss`.
-- For custom scrollbars, prefer `@include scrollbars(...)` from `web-ui/src/scss/base/_mixins.scss` (avoid hand-rolled `::-webkit-scrollbar` blocks).
+**SCSS Coding Conventions (MUST follow):**
+
+1. **Use SCSS variables instead of hardcoded values:**
+```scss
+// ❌ Bad
+.element { color: #667eea; border-radius: 8px; }
+
+// ✅ Good
+.element { color: $color-primary; border-radius: $radius-lg; }
+```
+
+2. **Use proper SCSS nesting for related elements:**
+```scss
+// ❌ Bad (flat CSS)
+.card { ... }
+.card:hover { ... }
+.card .title { ... }
+
+// ✅ Good (nested SCSS)
+.card {
+  ...
+  &:hover { ... }
+  .title { ... }
+}
+```
+
+3. **Use mixins for common patterns:**
+```scss
+// ❌ Bad (repeated code)
+.btn { padding: 0.6rem; border: none; border-radius: 6px; cursor: pointer; }
+
+// ✅ Good
+.btn {
+  @include button-base($radius: $radius-md);
+  background: $color-primary;
+}
+```
+
+4. **Organize with section comments:**
+```scss
+// ========================
+// Header Section
+// ========================
+.header { ... }
+
+// ========================
+// Content Area
+// ========================
+.content { ... }
+```
+
+5. **Keep nesting shallow (max 3-4 levels)**
+
+**Key Variables (see `_variables.scss` for full list):**
+- Colors: `$color-primary`, `$color-secondary`, `$color-text`, `$color-text-muted`, `$color-bg`, `$color-surface`, `$color-border`, `$color-error`, `$color-warning`, `$color-info`
+- Extended colors: `$color-primary-light/lighter/dark`, `$color-error-light/dark`, `$color-danger-accent`, `$color-critical-accent`
+- Status backgrounds: `$bg-success-soft`, `$bg-warning-soft`, `$bg-error-soft`, `$bg-info-soft`
+- Radii: `$radius-sm` (4px), `$radius-md` (6px), `$radius-lg` (8px), `$radius-xl` (12px)
+- Shadows: `$shadow-sm`, `$shadow-md`, `$shadow-lg`, `$shadow-float`
+- Z-index: `$z-dropdown` (1000), `$z-modal` (2000), `$z-toast` (9999)
+- Gradients: `$gradient-brand`, `$gradient-brand-soft`
+- Transitions: `$transition-fast` (0.15s), `$transition` (0.2s), `$transition-slow` (0.3s)
+
+**Key Mixins (see `_mixins.scss` for full list):**
+- `@include modal-overlay(...)` - Full-screen backdrop with blur
+- `@include modal-panel(...)` - Modal container styling
+- `@include panel-header(...)` - Gradient header bar
+- `@include close-button(...)` - Light background close button
+- `@include close-button-inverse(...)` - Dark/gradient background close button
+- `@include button-base(...)` - Button structure (no colors)
+- `@include accent-solid-button(...)` - Colored button with hover
+- `@include input-base(...)` - Form input/select styling
+- `@include control-compact(...)` - Smaller form controls
+- `@include scrollbars(...)` - Custom scrollbar styling
+- `@include lift-hover(...)` - translateY + shadow on hover
+- `@include status-banner(...)` - Info/success/warning/error boxes
+- `@include focus-ring(...)` - Focus outline
+- `@include truncate-one-line` - Text ellipsis
+
+**Animation Keyframes:**
+- Use shared `vr-*` keyframes from `_animations.scss`: `vr-spin`, `vr-pulse`, `vr-shimmer`, `vr-slide-down`, `vr-highlight-pulse`
+- Avoids global keyframe name collisions with Vue scoped styles
 
 ### Collections System Architecture
 **Multi-tenant document isolation** - Each collection is a separate Qdrant collection with independent documents:
